@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { SpinnerIcon, EyeIcon, EyeOffIcon, SunIcon, MoonIcon } from './common/Icon';
+import { SpinnerIcon, EyeIcon, EyeOffIcon, SunIcon, MoonIcon, HelpIcon } from './common/Icon';
 import { useDarkMode } from '../hooks/useDarkMode';
+import HelpModal from './HelpModal';
 
 const ValidationRequirement: React.FC<{isValid: boolean; text: string}> = ({ isValid, text }) => (
     <div className={`flex items-center text-sm transition-colors ${isValid ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
@@ -26,6 +27,7 @@ const Auth: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
   
   const [passwordValidation, setPasswordValidation] = useState({
     minLength: false,
@@ -96,7 +98,15 @@ const Auth: React.FC = () => {
 
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center bg-brand-light dark:bg-brand-dark p-4">
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex items-center space-x-2">
+            <button
+              onClick={() => setShowHelpModal(true)}
+              className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-yellow-dark"
+              aria-label="Ajuda"
+              title="Ajuda e Guia de Uso"
+            >
+              <HelpIcon className="w-6 h-6" />
+            </button>
             <button
                 onClick={toggleTheme}
                 className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-yellow-dark"
@@ -213,6 +223,7 @@ const Auth: React.FC = () => {
           </button>
         </p>
       </div>
+      {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
     </div>
   );
 };

@@ -1,0 +1,5 @@
+{
+  "name": "NCMIT - Leitor de Nota Fiscal",
+  "description": "Uma aplicação web para ler, analisar e gerenciar notas fiscais eletrônicas (NF-e) a partir de arquivos XML. Permite visualização de dados, filtros avançados, e exportação de relatórios, com integração ao Supabase para armazenamento de histórico.",
+  "requestFramePermissions": []
+}

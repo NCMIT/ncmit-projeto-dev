@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NCMIT - Leitor de Nota Fiscal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'brand-yellow': {
+                light: '#FEF3C7',
+                DEFAULT: '#FBBF24',
+                dark: '#D97706',
+              },
+              'brand-red': {
+                light: '#FECACA',
+                DEFAULT: '#F87171',
+                dark: '#DC2626',
+              },
+              'brand-dark': '#1C1C1C', // Cinza escuro neutro para o fundo
+              'brand-surface-dark': '#2A2A2A', // Cinza para superfícies (cards, etc)
+              'brand-light': '#FFFDF5', // Amarelo suave quase branco
+            },
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Custom styles for the dual-range slider thumb */
+      input[type=range].range-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        background: transparent;
+        position: absolute;
+        left: 0;
+        pointer-events: none; /* The track is not clickable */
+      }
+      
+      input[type=range].range-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        pointer-events: all; /* But the thumb is */
+        margin-top: -8px; /* Vertically center the thumb on the 2px height track */
+        height: 1.25rem; /* 20px */
+        width: 1.25rem; /* 20px */
+        border-radius: 9999px; /* full */
+        background: #FBBF24; /* brand-yellow */
+        border: 2px solid white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        cursor: pointer;
+      }
+
+      input[type=range].range-slider::-moz-range-thumb {
+        pointer-events: all;
+        height: 1.25rem;
+        width: 1.25rem;
+        border-radius: 9999px;
+        background: #FBBF24;
+        border: 2px solid white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        cursor: pointer;
+        border: none; /* Firefox adds a border by default */
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
+    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.76.1",
+    "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^5.0.2"
+  }
+}
+</script>
+</head>
+  <body class="bg-brand-light dark:bg-brand-dark">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

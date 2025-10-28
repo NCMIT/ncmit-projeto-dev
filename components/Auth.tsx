@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { SpinnerIcon, EyeIcon, EyeOffIcon } from './common/Icon';
+import { SpinnerIcon, EyeIcon, EyeOffIcon, SunIcon, MoonIcon } from './common/Icon';
+import { useDarkMode } from '../hooks/useDarkMode';
 
 const ValidationRequirement: React.FC<{isValid: boolean; text: string}> = ({ isValid, text }) => (
     <div className={`flex items-center text-sm transition-colors ${isValid ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
@@ -16,6 +17,7 @@ const ValidationRequirement: React.FC<{isValid: boolean; text: string}> = ({ isV
 
 
 const Auth: React.FC = () => {
+  const [theme, toggleTheme] = useDarkMode();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -93,7 +95,18 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-brand-light dark:bg-brand-dark p-4">
+    <div className="min-h-screen relative flex flex-col items-center justify-center bg-brand-light dark:bg-brand-dark p-4">
+        <div className="absolute top-4 right-4">
+            <button
+                onClick={toggleTheme}
+                className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-yellow-dark"
+                aria-label="Toggle dark mode"
+                title="Alterar tema"
+            >
+                {theme === 'light' ? <MoonIcon className="w-6 h-6" /> : <SunIcon className="w-6 h-6" />}
+            </button>
+        </div>
+
        <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
               <span className="text-brand-yellow-dark">NC</span>

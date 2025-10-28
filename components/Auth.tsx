@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { SpinnerIcon } from './common/Icon';
+import { SpinnerIcon, EyeIcon, EyeOffIcon } from './common/Icon';
 
 const ValidationRequirement: React.FC<{isValid: boolean; text: string}> = ({ isValid, text }) => (
     <div className={`flex items-center text-sm transition-colors ${isValid ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
@@ -19,6 +19,8 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -49,17 +51,15 @@ const Auth: React.FC = () => {
 
   }, [email, password, isLogin]);
   
-  const isSignUpFormValid = isEmailValid && passwordValidation.minLength && passwordValidation.hasUpper && passwordValidation.hasNumber;
+  const passwordsMatch = password.length > 0 && password === confirmPassword;
+  const isSignUpFormValid = isEmailValid && passwordValidation.minLength && passwordValidation.hasUpper && passwordValidation.hasNumber && passwordsMatch;
 
   const handleAuth = async (event: React.FormEvent) => {
     event.preventDefault();
     
-    // Re-validate on submit for sign up
-    if (!isLogin) {
-      if (!isSignUpFormValid) {
-        setError('Por favor, corrija os erros antes de continuar.');
+    if (!isLogin && !isSignUpFormValid) {
+        setError('Por favor, atenda a todos os requisitos antes de continuar.');
         return;
-      }
     }
 
     setLoading(true);
@@ -88,6 +88,8 @@ const Auth: React.FC = () => {
     setError('');
     setEmail('');
     setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
   };
 
   return (
@@ -126,22 +128,54 @@ const Auth: React.FC = () => {
             <label htmlFor="password"  className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Senha
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              required
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-brand-yellow focus:border-brand-yellow sm:text-sm dark:bg-gray-900/50 dark:border-gray-700"
-              placeholder="********"
-            />
+             <div className="relative mt-1">
+                <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    required
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-brand-yellow focus:border-brand-yellow sm:text-sm dark:bg-gray-900/50 dark:border-gray-700"
+                    placeholder="********"
+                />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 dark:text-gray-400" aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}>
+                    {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                </button>
+            </div>
           </div>
           
+           {!isLogin && (
+                <div>
+                    <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Confirmar Senha
+                    </label>
+                    <div className="relative mt-1">
+                        <input
+                            id="confirmPassword"
+                            type={showPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            required
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className={`block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none sm:text-sm dark:bg-gray-900/50 ${!passwordsMatch && confirmPassword.length > 0 ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-gray-700 focus:ring-brand-yellow focus:border-brand-yellow'}`}
+                            placeholder="********"
+                        />
+                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 dark:text-gray-400" aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}>
+                            {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        </button>
+                    </div>
+                    {!passwordsMatch && confirmPassword.length > 0 && (
+                        <p className="mt-1 text-xs text-red-500">As senhas não conferem.</p>
+                    )}
+                </div>
+            )}
+
+
           {!isLogin && (
             <div className="pt-2 space-y-1">
               <ValidationRequirement isValid={passwordValidation.minLength} text="Mínimo de 6 caracteres" />
               <ValidationRequirement isValid={passwordValidation.hasUpper} text="Pelo menos uma letra maiúscula (A-Z)" />
               <ValidationRequirement isValid={passwordValidation.hasNumber} text="Pelo menos um número (0-9)" />
+              <ValidationRequirement isValid={passwordsMatch} text="As senhas devem ser iguais" />
             </div>
           )}
 

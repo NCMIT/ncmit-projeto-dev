@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filtros } from '../types';
+import type { Filtros } from '../types';
 import { ExcelIcon, ClearIcon, FilterIcon, ChevronDownIcon, TaxIcon } from './common/Icon';
 
 interface FiltersProps {

@@ -41,3 +41,9 @@ export interface Toast {
   message: string;
   type: 'success' | 'error' | 'info';
 }
+
+export interface EstadoICMS {
+    uf: string;
+    aliquota: number;
+    fcp: number;
+}

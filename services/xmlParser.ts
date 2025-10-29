@@ -1,4 +1,4 @@
-import { NotaFiscal, ItemNotaFiscal } from '../types';
+import type { NotaFiscal, ItemNotaFiscal } from '../types';
 
 const NFE_NAMESPACE = "http://www.portalfiscal.inf.br/nfe";
 

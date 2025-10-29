@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // As credenciais do Supabase são colocadas diretamente aqui para a hospedagem.
 // A chave 'anon public' é segura para ser exposta no frontend.

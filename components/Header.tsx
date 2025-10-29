@@ -1,7 +1,7 @@
 import React from 'react';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { SunIcon, MoonIcon, HelpIcon, LogoutIcon, LogoIcon } from './common/Icon';
-import { Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabaseClient';
 
 interface HeaderProps {

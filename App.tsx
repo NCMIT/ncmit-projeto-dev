@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, supabaseInitializationError } from './services/supabaseClient';
-import { NotaFiscal, Filtros, Toast } from './types';
+import type { NotaFiscal, Filtros, Toast } from './types';
 import { parseNFeXML } from './services/xmlParser';
 import Header from './components/Header';
 import FileUpload from './components/FileUpload';
@@ -12,7 +12,7 @@ import AliquotaModal from './components/AliquotaModal';
 import Auth from './components/Auth';
 import ToastContainer from './components/Toast';
 import { utils, writeFile } from 'xlsx';
-import { Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 
 const getDetailedErrorMessage = (error: any): string => {
     if (error instanceof Error) return error.message;

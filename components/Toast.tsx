@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Toast } from '../types';
+import type { Toast } from '../types';
 import { SuccessIcon, ErrorIcon, InfoIcon, CloseIcon } from './common/Icon';
 
 const ICONS = {

@@ -1,20 +1,12 @@
 import React, { useState } from 'react';
-import { NotaFiscal, ItemNotaFiscal } from '../types';
+import type { NotaFiscal } from '../types';
 import { SpinnerIcon } from './common/Icon';
-import { ALIQUOTAS_DATA, ESTADOS_ICMS, MVA_AUTOPECAS_PADRAO, getAliquotaInterestadual, EstadoICMS } from './AliquotaModal';
+import { calculateTaxEstimate } from '../services/taxCalculator';
+import type { TaxEstimateResult } from '../services/taxCalculator';
 
 interface NotaFiscalDetailModalProps {
   nota: NotaFiscal;
   onClose: () => void;
-}
-
-interface TaxEstimateResult {
-    imposto_estimado_total: number;
-    imposto_estimado_icms: number;
-    imposto_estimado_ipi: number;
-    imposto_estimado_pis_cofins: number;
-    diferenca_imposto: number;
-    calculo_premissas: string;
 }
 
 const DetailCard: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => (
@@ -33,84 +25,11 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
     
     // Simula um delay para feedback visual
     setTimeout(() => {
-        const ipiRates = (() => {
-            const ipiData = ALIQUOTAS_DATA.find(t => t.shortName === 'IPI');
-            const ipiSection = ipiData?.sections.find(s => s.title.includes('Exemplos de Alíquotas'));
-            const rates = new Map<string, number>();
-
-            if (ipiSection && Array.isArray(ipiSection.content)) {
-                (ipiSection.content as string[]).forEach(item => {
-                    const match = item.match(/NCM\s*([\d.]+).*:\s*([\d.]+)%/);
-                    if (match) {
-                        const ncm = match[1].replace(/\./g, '');
-                        const rate = parseFloat(match[2]);
-                        rates.set(ncm, rate);
-                    }
-                });
-            }
-            return rates;
-        })();
-
-        const pisCofinsRate = 13.1; // PIS/COFINS Monofásico
-        let totalIcms = 0, totalIpi = 0, totalPisCofins = 0;
-        const details: string[] = [];
-
-        const getEstado = (uf: string): EstadoICMS => ESTADOS_ICMS.find(e => e.uf === uf) || { uf, aliquota: 18, fcp: 0 };
-
-        const estadoOrigem = getEstado(nota.uf_emitente);
-        const estadoDestino = nota.uf_destinatario ? getEstado(nota.uf_destinatario) : estadoOrigem;
-        const isOperationInterestadual = !!nota.uf_destinatario && nota.uf_emitente !== nota.uf_destinatario;
-
-        nota.item_nota_fiscal.forEach(item => {
-            const valorBase = item.valor_total || 0;
-            totalPisCofins += valorBase * (pisCofinsRate / 100);
-
-            const ncmLimpo = (item.codigo_ncm || '').replace(/\./g, '');
-            let valorIpiItem = 0;
-            if (ncmLimpo && ipiRates.has(ncmLimpo)) {
-                valorIpiItem = valorBase * (ipiRates.get(ncmLimpo)! / 100);
-                totalIpi += valorIpiItem;
-            }
-
-            const baseCalculoIcms = valorBase + valorIpiItem;
-
-            if (!isOperationInterestadual) {
-                totalIcms += baseCalculoIcms * ((estadoOrigem.aliquota + estadoOrigem.fcp) / 100);
-            } else {
-                const aliquotaInterestadual = getAliquotaInterestadual(estadoOrigem.uf, estadoDestino.uf);
-                const icmsProprio = baseCalculoIcms * (aliquotaInterestadual / 100);
-                const baseCalculoST = baseCalculoIcms * (1 + MVA_AUTOPECAS_PADRAO / 100);
-                const icmsTotalST = baseCalculoST * ((estadoDestino.aliquota + estadoDestino.fcp) / 100);
-                const icmsSTaRecolher = Math.max(0, icmsTotalST - icmsProprio);
-                totalIcms += icmsProprio + icmsSTaRecolher;
-            }
-        });
-
-        if (!isOperationInterestadual) {
-            details.unshift(`- ICMS calculado como Operação Interna em ${estadoOrigem.uf} (Alíquota ${estadoOrigem.aliquota}% + FCP ${estadoOrigem.fcp}%).`);
-        } else {
-            const aliquotaInterestadual = getAliquotaInterestadual(estadoOrigem.uf, estadoDestino.uf);
-            details.unshift(`- ICMS-ST de ${estadoOrigem.uf} para ${estadoDestino.uf} (Alíq. Interestadual ${aliquotaInterestadual}%, Alíq. Interna Dest. ${(estadoDestino.aliquota + estadoDestino.fcp).toFixed(2)}%).`);
-            details.unshift(`- ICMS-ST calculado usando MVA de ${MVA_AUTOPECAS_PADRAO}%.`);
-        }
-        details.unshift(`- PIS/COFINS calculado com alíquota de ${pisCofinsRate}% (Regime Monofásico).`);
-        details.unshift(`- O valor do IPI foi somado à base de cálculo do ICMS.`);
-        details.push(`- Cálculo não considera DIFAL (aplicável a não contribuintes) ou regimes especiais.`);
-
-
-        const totalEstimado = totalIcms + totalIpi + totalPisCofins;
-        
-        setAnalysisResult({
-            imposto_estimado_total: totalEstimado,
-            imposto_estimado_icms: totalIcms,
-            imposto_estimado_ipi: totalIpi,
-            imposto_estimado_pis_cofins: totalPisCofins,
-            diferenca_imposto: totalEstimado - nota.imposto_total,
-            calculo_premissas: details.join('\n'),
-        });
-
+        const { item_nota_fiscal, ...notaCore } = nota;
+        const result = calculateTaxEstimate(notaCore, item_nota_fiscal);
+        setAnalysisResult(result);
         setIsCalculating(false);
-    }, 500); // Fim do setTimeout
+    }, 500);
   };
 
   return (

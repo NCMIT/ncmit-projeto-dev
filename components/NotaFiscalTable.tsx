@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NotaFiscal } from '../types';
+import type { NotaFiscal } from '../types';
 import { SpinnerIcon } from './common/Icon';
 
 interface NotaFiscalTableProps {

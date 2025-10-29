@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NotaFiscal } from '../types';
 
 interface NotaFiscalDetailModalProps {
@@ -14,11 +14,6 @@ const DetailCard: React.FC<{ title: string, children: React.ReactNode }> = ({ ti
 );
 
 const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onClose }) => {
-  const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null);
-
-  const handleToggleExpand = (index: number) => {
-    setExpandedItemIndex(prevIndex => (prevIndex === index ? null : index));
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
@@ -42,7 +37,7 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
         <div className="p-6 space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <DetailCard title="Data de Emissão">
-                    <p className="text-lg font-semibold dark:text-white">{new Date(nota.data_emissao).toLocaleString()}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{new Date(nota.data_emissao).toLocaleString()}</p>
                 </DetailCard>
                  <DetailCard title="Valor Total">
                     <p className="text-lg font-semibold text-green-600 dark:text-green-400">R$ {nota.valor_total.toFixed(2)}</p>
@@ -51,24 +46,24 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
                     <p className="text-lg font-semibold text-red-500 dark:text-red-400">R$ {nota.imposto_total.toFixed(2)}</p>
                 </DetailCard>
                 <DetailCard title="Itens">
-                    <p className="text-lg font-semibold dark:text-white">{nota.item_nota_fiscal.length}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{nota.item_nota_fiscal.length}</p>
                 </DetailCard>
             </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-700 dark:text-gray-300">
                 <div className="space-y-2">
-                    <h3 className="text-lg font-semibold border-b pb-2 dark:border-gray-600">Emitente</h3>
+                    <h3 className="text-lg font-semibold border-b pb-2 dark:border-gray-600 text-gray-900 dark:text-white">Emitente</h3>
                     <p><strong>Nome:</strong> {nota.nome_emitente}</p>
                 </div>
                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold border-b pb-2 dark:border-gray-600">Destinatário</h3>
+                    <h3 className="text-lg font-semibold border-b pb-2 dark:border-gray-600 text-gray-900 dark:text-white">Destinatário</h3>
                     <p><strong>Nome:</strong> {nota.nome_destinatario}</p>
                     <p><strong>Documento:</strong> {nota.doc_destinatario}</p>
                 </div>
             </div>
 
             <div>
-                <h3 className="text-lg font-semibold mb-2">Produtos/Serviços</h3>
+                <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Produtos/Serviços</h3>
                 <div className="overflow-x-auto border rounded-lg dark:border-gray-700">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -83,32 +78,14 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
                         </thead>
                         <tbody className="bg-white dark:bg-brand-surface-dark divide-y divide-gray-200 dark:divide-gray-600">
                             {nota.item_nota_fiscal.map((p, index) => (
-                                <React.Fragment key={index}>
-                                    <tr onClick={() => handleToggleExpand(index)} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/40">
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm">{p.codigo}</td>
-                                        <td className="px-4 py-2 text-sm">{p.descricao}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm">{p.codigo_ncm}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right">{p.quantidade} {p.unidade}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right">R$ {p.valor_unitario.toFixed(2)}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right">R$ {p.valor_total.toFixed(2)}</td>
-                                     </tr>
-                                     {expandedItemIndex === index && (
-                                        <tr className="bg-gray-100 dark:bg-gray-900">
-                                            <td colSpan={6} className="p-4">
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <h4 className="font-bold">Ações do Item</h4>
-                                                        <p className="text-sm text-gray-600 dark:text-gray-400">Informações adicionais sobre o produto apareceriam aqui.</p>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <button className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded text-sm">Editar</button>
-                                                        <button className="bg-brand-red hover:bg-brand-red-dark text-white font-bold py-1 px-3 rounded text-sm">Excluir</button>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                     )}
-                                </React.Fragment>
+                                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-300">{p.codigo}</td>
+                                    <td className="px-4 py-2 text-sm text-gray-800 dark:text-gray-300">{p.descricao}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-300">{p.codigo_ncm}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-800 dark:text-gray-300">{p.quantidade} {p.unidade}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-800 dark:text-gray-300">R$ {p.valor_unitario.toFixed(2)}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-800 dark:text-gray-300">R$ {p.valor_total.toFixed(2)}</td>
+                                 </tr>
                             ))}
                         </tbody>
                     </table>

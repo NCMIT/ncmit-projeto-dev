@@ -8,10 +8,9 @@ import Filters from './components/Filters';
 import NotaFiscalTable from './components/NotaFiscalTable';
 import NotaFiscalDetailModal from './components/NotaFiscalDetailModal';
 import HelpModal from './components/HelpModal';
+import AliquotaModal from './components/AliquotaModal';
 import Auth from './components/Auth';
 import ToastContainer from './components/Toast';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { utils, writeFile } from 'xlsx';
 import { Session } from '@supabase/supabase-js';
 
@@ -43,6 +42,7 @@ const App: React.FC = () => {
   const [selectedNota, setSelectedNota] = useState<NotaFiscal | null>(null);
   const [filtros, setFiltros] = useState<Filtros>({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0 });
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
+  const [showAliquotaModal, setShowAliquotaModal] = useState<boolean>(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = useCallback((message: string, type: Toast['type']) => {
@@ -243,22 +243,6 @@ const App: React.FC = () => {
     setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: maxValorAbsoluto });
   };
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Relatório de Notas Fiscais", 14, 16);
-    (doc as any).autoTable({
-      head: [['Número', 'Emissão', 'Emitente', 'Valor Total']],
-      body: filteredNotas.map(n => [
-          n.numero, 
-          new Date(n.data_emissao).toLocaleDateString('pt-BR'), 
-          n.nome_emitente || 'N/A', 
-          `R$ ${n.valor_total.toFixed(2)}`
-      ]),
-      startY: 20,
-    });
-    doc.save('relatorio_notas_fiscais.pdf');
-  };
-
   const handleExportExcel = () => {
     const worksheetData = filteredNotas.flatMap(n => ([
       { A: "Chave de Acesso", B: n.chave_acesso },
@@ -308,9 +292,9 @@ const App: React.FC = () => {
             <Filters 
               filtros={filtros} 
               setFiltros={setFiltros} 
-              onExportPDF={handleExportPDF} 
               onExportExcel={handleExportExcel}
               onClearFilters={handleClearFilters}
+              onShowAliquotas={() => setShowAliquotaModal(true)}
               maxValorAbsoluto={maxValorAbsoluto}
             />
             <NotaFiscalTable
@@ -323,6 +307,7 @@ const App: React.FC = () => {
       </main>
       {selectedNota && <NotaFiscalDetailModal nota={selectedNota} onClose={() => setSelectedNota(null)} />}
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
+      {showAliquotaModal && <AliquotaModal onClose={() => setShowAliquotaModal(false)} />}
     </div>
   );
 };

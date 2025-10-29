@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { Filtros } from '../types';
-import { ExcelIcon, PdfIcon, ClearIcon, FilterIcon, ChevronDownIcon } from './common/Icon';
+import { ExcelIcon, ClearIcon, FilterIcon, ChevronDownIcon, TaxIcon } from './common/Icon';
 
 interface FiltersProps {
   filtros: Filtros;
   setFiltros: React.Dispatch<React.SetStateAction<Filtros>>;
-  onExportPDF: () => void;
   onExportExcel: () => void;
   onClearFilters: () => void;
+  onShowAliquotas: () => void;
   maxValorAbsoluto: number;
 }
 
-const Filters: React.FC<FiltersProps> = ({ filtros, setFiltros, onExportPDF, onExportExcel, onClearFilters, maxValorAbsoluto }) => {
+const Filters: React.FC<FiltersProps> = ({ filtros, setFiltros, onExportExcel, onClearFilters, onShowAliquotas, maxValorAbsoluto }) => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,9 +50,9 @@ const Filters: React.FC<FiltersProps> = ({ filtros, setFiltros, onExportPDF, onE
                 <ChevronDownIcon className={`w-5 h-5 transition-transform ${isPanelOpen ? 'rotate-180' : ''}`} />
             </button>
             <div className="flex items-center gap-2">
-                 <button onClick={onExportPDF} className="flex items-center justify-center gap-2 bg-brand-red hover:bg-brand-red-dark text-white font-bold py-2 px-4 rounded-md transition-colors" title="Exportar a visualização atual da tabela para um arquivo PDF.">
-                    <PdfIcon className="w-5 h-5" />
-                    <span className="hidden sm:inline">PDF</span>
+                <button onClick={onShowAliquotas} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors" title="Consultar alíquotas de impostos padrão.">
+                    <TaxIcon className="w-5 h-5" />
+                    <span className="hidden sm:inline">Alíquotas</span>
                 </button>
                 <button onClick={onExportExcel} className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors" title="Exportar os dados detalhados das notas fiscais filtradas para um arquivo Excel.">
                     <ExcelIcon className="w-5 h-5" />

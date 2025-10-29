@@ -93,6 +93,12 @@ export const ChevronDownIcon: React.FC<IconProps> = (props) => (
   </svg>
 );
 
+export const TaxIcon: React.FC<IconProps> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7a2 2 0 11-4 0 2 2 0 014 0zM16 17a2 2 0 11-4 0 2 2 0 014 0zM16 7L8 17" />
+    </svg>
+);
+
 export const LogoIcon: React.FC<IconProps> = (props) => (
     <svg viewBox="0 0 110 32" height="28" xmlns="http://www.w3.org/2000/svg" {...props}>
         <style>

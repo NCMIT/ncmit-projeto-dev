@@ -13,6 +13,7 @@ function getTagValue(element: Element | null, tagName: string): string {
     return tag?.textContent || '';
 }
 
+// FIX: Corrected typo in Omit type from 'fk_nota_fiscal_chave_a cesso' to 'fk_nota_fiscal_chave_acesso'.
 export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fiscal'> & { items: Omit<ItemNotaFiscal, 'id' | 'fk_nota_fiscal_chave_acesso'>[] } {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlString, "application/xml");
@@ -69,15 +70,26 @@ export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fisc
     }
   }
 
-  const impostoTotal = 
+  // Lógica de cálculo de impostos aprimorada.
+  // Prioriza o campo vTotTrib, que é o valor total aproximado de tributos (Lei da Transparência).
+  // Se não estiver presente, soma os principais campos de tributos.
+  let impostoTotal = parseFloat(getTagValue(ICMSTot, 'vTotTrib') || '0');
+
+  if (impostoTotal === 0) {
+    impostoTotal = 
       parseFloat(getTagValue(ICMSTot, 'vICMS') || '0') +
       parseFloat(getTagValue(ICMSTot, 'vST') || '0') +
+      parseFloat(getTagValue(ICMSTot, 'vFCP') || '0') +
       parseFloat(getTagValue(ICMSTot, 'vFCPST') || '0') +
+      parseFloat(getTagValue(ICMSTot, 'vFCPSTRet') || '0') +
       parseFloat(getTagValue(ICMSTot, 'vII') || '0') +
       parseFloat(getTagValue(ICMSTot, 'vIPI') || '0') +
       parseFloat(getTagValue(ICMSTot, 'vPIS') || '0') +
       parseFloat(getTagValue(ICMSTot, 'vCOFINS') || '0') +
-      parseFloat(getTagValue(ICMSTot, 'vOutro') || '0');
+      parseFloat(getTagValue(ICMSTot, 'vICMSUFDest') || '0') + // Diferencial de Alíquota (Destino)
+      parseFloat(getTagValue(ICMSTot, 'vICMSUFRemet') || '0') + // Diferencial de Alíquota (Remetente)
+      parseFloat(getTagValue(ICMSTot, 'vFCPUFDest') || '0'); // FCP para UF de Destino
+  }
 
   const chaveAcesso = infNFe.getAttribute('Id')?.replace('NFe', '').trim() || '';
   if (!chaveAcesso) throw new Error("Estrutura de NFe inválida: Atributo 'Id' da tag <infNFe> não encontrado, não foi possível extrair a chave de acesso.");

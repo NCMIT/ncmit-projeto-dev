@@ -44,7 +44,7 @@ const Header: React.FC<HeaderProps> = ({ onShowHelp, session }) => {
                   onClick={onShowHelp}
                   className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-yellow-dark"
                   aria-label="Ajuda"
-                  title="Ajuda e Guia de Uso"
+                  title="Ajuda"
                 >
                   <HelpIcon className="w-6 h-6" />
                 </button>

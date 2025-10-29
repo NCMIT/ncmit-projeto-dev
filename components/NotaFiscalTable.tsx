@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { NotaFiscal } from '../types';
-import { SpinnerIcon } from './common/Icon';
+import { SpinnerIcon, WarningIcon } from './common/Icon';
 
 interface NotaFiscalTableProps {
   notas: NotaFiscal[];
@@ -44,6 +44,25 @@ const NotaFiscalTable: React.FC<NotaFiscalTableProps> = ({ notas, onSelectNota, 
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   };
 
+  const renderDiferenca = (diferenca: number | undefined | null) => {
+    if (diferenca == null) {
+      return <span className="text-gray-400 dark:text-gray-500">N/A</span>;
+    }
+
+    let textColor = 'text-gray-500 dark:text-gray-300';
+    if (diferenca > 0.01) {
+      textColor = 'text-yellow-600 dark:text-yellow-400 font-semibold';
+    } else if (diferenca < -0.01) {
+      textColor = 'text-green-600 dark:text-green-400';
+    }
+
+    return (
+      <span className={textColor}>
+        R$ {diferenca.toFixed(2)}
+      </span>
+    );
+  };
+
   return (
     <>
       <div className="overflow-x-auto">
@@ -55,6 +74,11 @@ const NotaFiscalTable: React.FC<NotaFiscalTableProps> = ({ notas, onSelectNota, 
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Nome da empresa que emitiu a Nota Fiscal.">Emitente</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Valor total dos produtos/serviços na Nota Fiscal.">Valor Total</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Soma dos impostos calculados na Nota Fiscal.">Impostos</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Diferença entre o imposto estimado e o declarado.">Diferença (Est.)</th>
+              <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Indica se a nota contém itens com NCM desconhecido para o cálculo de IPI.">
+                <span className="sr-only">Alerta NCM</span>
+                <WarningIcon className="w-4 h-4 mx-auto" />
+              </th>
               <th scope="col" className="relative px-6 py-3">
                 <span className="sr-only">Detalhes</span>
               </th>
@@ -68,6 +92,10 @@ const NotaFiscalTable: React.FC<NotaFiscalTableProps> = ({ notas, onSelectNota, 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 truncate max-w-xs">{nota.nome_emitente}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">R$ {nota.valor_total.toFixed(2)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">R$ {nota.imposto_total.toFixed(2)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">{renderDiferenca(nota.diferenca_imposto)}</td>
+                <td className="px-4 py-4 whitespace-nowrap text-center text-sm">
+                  {nota.possui_ncm_desconhecido && <WarningIcon className="w-5 h-5 text-yellow-500 mx-auto" title="Contém NCMs desconhecidos. O cálculo do IPI pode estar incompleto." />}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button onClick={() => onSelectNota(nota)} className="text-brand-yellow-dark hover:text-brand-yellow">
                     Detalhes

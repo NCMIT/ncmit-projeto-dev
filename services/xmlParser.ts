@@ -59,6 +59,19 @@ export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fisc
   for (const det of detElements) {
     const prod = getElement(det, 'prod');
     if (prod) {
+        let cstIcms = '';
+        const imposto = getElement(det, 'imposto');
+        if (imposto) {
+            const icms = getElement(imposto, 'ICMS');
+            if (icms) {
+                // Estrutura: <ICMS><ICMSxx><CST>xx</CST></ICMSxx></ICMS> ou <ICMS><ICMSSNxx><CSOSN>xx</CSOSN></ICMSSNxx></ICMS>
+                const icmsGroup = icms.firstElementChild; // Pega <ICMSxx> ou <ICMSSNxx>
+                if (icmsGroup) {
+                    cstIcms = getTagValue(icmsGroup, 'CST') || getTagValue(icmsGroup, 'CSOSN') || '';
+                }
+            }
+        }
+
         items.push({
             codigo: getTagValue(prod, 'cProd'),
             codigo_ncm: getTagValue(prod, 'NCM'),
@@ -67,6 +80,7 @@ export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fisc
             unidade: getTagValue(prod, 'uCom'),
             valor_unitario: parseFloat(getTagValue(prod, 'vUnCom') || '0'),
             valor_total: parseFloat(getTagValue(prod, 'vProd') || '0'),
+            cst_icms: cstIcms,
         });
     }
   }
@@ -102,11 +116,13 @@ export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fisc
     valor_total: parseFloat(getTagValue(ICMSTot, 'vNF') || '0'),
     imposto_total: impostoTotal,
     nome_emitente: getTagValue(emit, 'xNome'),
+    regime_tributario_emitente: getTagValue(emit, 'CRT'),
     // FIX: Corrected typo from getTaggValue to getTagValue.
     uf_emitente: getTagValue(enderEmit, 'UF'),
     uf_destinatario: enderDest ? getTagValue(enderDest, 'UF') : '',
     nome_destinatario: getTagValue(dest, 'xNome'),
     doc_destinatario: getTagValue(dest, 'CNPJ') || getTagValue(dest, 'CPF') || '',
+    indicador_ie_destinatario: getTagValue(dest, 'indIEDest'),
     items: items,
   };
 }

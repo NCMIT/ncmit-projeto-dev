@@ -72,6 +72,12 @@ Este é um guia completo para configurar e rodar o projeto NCMIT em sua máquina
         doc_destinatario TEXT,
         uf_emitente CHAR(2) REFERENCES estado(uf),
         uf_destinatario CHAR(2) REFERENCES estado(uf),
+        -- Colunas para análise fiscal automática
+        imposto_estimado_total DECIMAL(15, 2),
+        diferenca_imposto DECIMAL(15, 2),
+        calculo_premissas TEXT,
+        data_calculo TIMESTAMPTZ,
+        possui_ncm_desconhecido BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 

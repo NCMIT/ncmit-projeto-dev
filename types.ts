@@ -10,6 +10,7 @@ export interface ItemNotaFiscal {
   unidade: string;
   valor_unitario: number;
   valor_total: number;
+  cst_icms?: string;
 }
 
 export interface NotaFiscal {
@@ -23,7 +24,15 @@ export interface NotaFiscal {
   doc_destinatario: string;
   uf_emitente: string;
   uf_destinatario: string;
+  indicador_ie_destinatario?: string;
+  regime_tributario_emitente?: string;
   user_id?: string;
+  // Campos da análise fiscal automática
+  imposto_estimado_total?: number;
+  diferenca_imposto?: number;
+  calculo_premissas?: string;
+  data_calculo?: string;
+  possui_ncm_desconhecido?: boolean;
   // Propriedade populada pelo join do Supabase
   item_nota_fiscal: ItemNotaFiscal[];
 }

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase, supabaseInitializationError } from './services/supabaseClient';
-import type { NotaFiscal, Filtros, Toast } from './types';
+import type { NotaFiscal, Filtros, Toast, ItemNotaFiscal } from './types';
 import { parseNFeXML } from './services/xmlParser';
+import { calculateTaxEstimate, ALIQUOTAS_DATA } from './services/taxCalculator';
 import Header from './components/Header';
 import FileUpload from './components/FileUpload';
 import Filters from './components/Filters';
@@ -31,7 +32,7 @@ const getDetailedErrorMessage = (error: any): string => {
 };
 
 type UploadResult = 
-  | { status: 'success'; file: string }
+  | { status: 'success'; file: string; nota: NotaFiscal }
   | { status: 'skipped'; file: string }
   | { status: 'failure'; file: string; reason: string };
 
@@ -44,6 +45,7 @@ const App: React.FC = () => {
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
   const [showAliquotaModal, setShowAliquotaModal] = useState<boolean>(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const sourcesChecked = useRef(false);
 
   const addToast = useCallback((message: string, type: Toast['type']) => {
     const newToast: Toast = {
@@ -57,6 +59,40 @@ const App: React.FC = () => {
   const removeToast = (id: number) => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   };
+
+  // Efeito para checar a atualidade das fontes de dados de alíquotas
+  useEffect(() => {
+    if (sourcesChecked.current || !session) return;
+    sourcesChecked.current = true;
+
+    const OUTDATED_THRESHOLD_DAYS = 180;
+    let isAnySourceOutdated = false;
+
+    for (const source of ALIQUOTAS_DATA) {
+        try {
+            const [day, month, year] = source.lastUpdated.split('/').map(Number);
+            // Meses em JavaScript são 0-indexados (0 = Janeiro, 11 = Dezembro)
+            const lastUpdatedDate = new Date(year, month - 1, day);
+            const today = new Date();
+            const diffTime = today.getTime() - lastUpdatedDate.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays > OUTDATED_THRESHOLD_DAYS) {
+                isAnySourceOutdated = true;
+                break; // Para a verificação se encontrar qualquer fonte desatualizada
+            }
+        } catch (e) {
+            console.error("Erro ao parsear a data da fonte de dados:", source.lastUpdated, e);
+        }
+    }
+
+    if (isAnySourceOutdated) {
+        addToast(
+            'Atenção: Algumas fontes de dados de alíquotas podem estar desatualizadas. Recomenda-se cautela.',
+            'info'
+        );
+    }
+  }, [session, addToast]);
 
 
   useEffect(() => {
@@ -116,6 +152,16 @@ const App: React.FC = () => {
     }
   }, [maxValorAbsoluto, filtros.valorMax]);
 
+  const handleUpdateNota = (updatedNota: NotaFiscal) => {
+      setNotasFiscais(prevNotas => 
+        prevNotas.map(n => n.chave_acesso === updatedNota.chave_acesso ? updatedNota : n)
+      );
+      // Also update the selectedNota if it's the one being changed
+      if (selectedNota?.chave_acesso === updatedNota.chave_acesso) {
+          setSelectedNota(updatedNota);
+      }
+  };
+
 
   if (supabaseInitializationError || !supabase) {
     return (
@@ -158,9 +204,16 @@ const App: React.FC = () => {
           return { status: 'skipped', file: file.name };
         }
         
+        const analysisResult = await calculateTaxEstimate(notaFiscalCoreData, items);
+
         const notaFiscalData = {
             ...notaFiscalCoreData,
             user_id: session.user.id,
+            imposto_estimado_total: analysisResult.imposto_estimado_total,
+            diferenca_imposto: analysisResult.diferenca_imposto,
+            calculo_premissas: analysisResult.calculo_premissas,
+            data_calculo: analysisResult.data_calculo,
+            possui_ncm_desconhecido: analysisResult.possui_ncm_desconhecido,
         };
 
         const { data: insertedNota, error: notaError } = await supabase!
@@ -172,8 +225,8 @@ const App: React.FC = () => {
         if (notaError) throw notaError;
         const chaveAcesso = insertedNota.chave_acesso;
 
-        if (items.length > 0) {
-          const itemsData = items.map(item => ({ ...item, fk_nota_fiscal_chave_acesso: chaveAcesso }));
+        const itemsData = items.map(item => ({ ...item, fk_nota_fiscal_chave_acesso: chaveAcesso }));
+        if (itemsData.length > 0) {
           const { error: itemsError } = await supabase!.from('item_nota_fiscal').insert(itemsData);
           if (itemsError) {
             await supabase!.from('nota_fiscal').delete().eq('chave_acesso', chaveAcesso); // Rollback
@@ -181,7 +234,12 @@ const App: React.FC = () => {
           }
         }
         
-        return { status: 'success', file: file.name };
+        const newNota: NotaFiscal = {
+            ...notaFiscalData,
+            item_nota_fiscal: itemsData,
+        };
+
+        return { status: 'success', file: file.name, nota: newNota };
       } catch (err: any) {
         return { 
           status: 'failure', 
@@ -193,24 +251,28 @@ const App: React.FC = () => {
 
     const results = await Promise.all(uploadPromises);
     
-    const status = {
-      successes: results.filter(r => r.status === 'success').length,
-      skips: results.filter(r => r.status === 'skipped').length,
-      failures: results.filter((r): r is Extract<UploadResult, { status: 'failure' }> => r.status === 'failure'),
-    };
+    const successfulUploads = results.filter((r): r is Extract<UploadResult, { status: 'success' }> => r.status === 'success');
+    const skippedUploads = results.filter(r => r.status === 'skipped');
+    const failedUploads = results.filter((r): r is Extract<UploadResult, { status: 'failure' }> => r.status === 'failure');
     
-    if (status.successes > 0) addToast(`${status.successes} nota(s) importada(s) com sucesso.`, 'success');
-    if (status.skips > 0) addToast(`${status.skips} nota(s) ignorada(s) (já existentes).`, 'info');
-    if (status.failures.length > 0) {
-        addToast(`${status.failures.length} arquivo(s) falharam ao importar. Verifique o console para detalhes.`, 'error');
-        console.error("Falhas no Upload:", status.failures);
+    if (successfulUploads.length > 0) {
+        addToast(`${successfulUploads.length} nota(s) importada(s) e analisada(s) com sucesso.`, 'success');
+    }
+    if (skippedUploads.length > 0) {
+        addToast(`${skippedUploads.length} nota(s) ignorada(s) (já existentes).`, 'info');
+    }
+    if (failedUploads.length > 0) {
+        addToast(`${failedUploads.length} arquivo(s) falharam ao importar. Verifique o console para detalhes.`, 'error');
+        console.error("Falhas no Upload:", failedUploads);
     }
 
-    if (status.successes > 0) {
-        await fetchNotasFiscais();
-    } else {
-        setLoading(false);
+    if (successfulUploads.length > 0) {
+        const newNotas = successfulUploads.map(s => s.nota);
+        setNotasFiscais(prev => [...prev, ...newNotas]);
+        setSelectedNota(newNotas[0]); // Abre o modal para a primeira nota nova
     }
+    
+    setLoading(false);
   };
 
   const filteredNotas = useMemo(() => {
@@ -243,6 +305,8 @@ const App: React.FC = () => {
       { A: "Doc. Destinatário", B: n.doc_destinatario },
       { A: "Valor Total", B: n.valor_total },
       { A: "Imposto Total", B: n.imposto_total },
+      { A: "Imposto Estimado", B: n.imposto_estimado_total },
+      { A: "Diferença Imposto", B: n.diferenca_imposto },
       {}, // Spacer row
       { A: "Cód. Item", B: "Descrição", C: "NCM", D: "Qtd", E: "Un.", F: "Vlr. Unit.", G: "Vlr. Total" },
       ...n.item_nota_fiscal.map(item => ({
@@ -294,7 +358,7 @@ const App: React.FC = () => {
           </div>
         </div>
       </main>
-      {selectedNota && <NotaFiscalDetailModal nota={selectedNota} onClose={() => setSelectedNota(null)} />}
+      {selectedNota && <NotaFiscalDetailModal nota={selectedNota} onClose={() => setSelectedNota(null)} onUpdateNota={handleUpdateNota} />}
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
       {showAliquotaModal && <AliquotaModal onClose={() => setShowAliquotaModal(false)} />}
     </div>

@@ -22,8 +22,9 @@ export interface NotaFiscal {
   nome_destinatario: string;
   doc_destinatario: string;
   uf_emitente: string;
+  uf_destinatario: string;
   user_id?: string;
-  // Esta propriedade será populada pelo join do Supabase
+  // Propriedade populada pelo join do Supabase
   item_nota_fiscal: ItemNotaFiscal[];
 }
 

@@ -22,7 +22,7 @@ const NotaFiscalTable: React.FC<NotaFiscalTableProps> = ({ notas, onSelectNota, 
     return (
       <div className="flex flex-col items-center justify-center text-center text-gray-500 dark:text-gray-400 py-8">
         <SpinnerIcon className="w-10 h-10 animate-spin text-brand-yellow-dark mb-3" />
-        <p className="text-lg">Carregando notas...</p>
+        <p className="text-lg">Carregando e processando notas...</p>
       </div>
     );
   }
@@ -51,7 +51,6 @@ const NotaFiscalTable: React.FC<NotaFiscalTableProps> = ({ notas, onSelectNota, 
           <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Número da Nota Fiscal.">Número NF</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Chave de Acesso única da Nota Fiscal.">Chave de Acesso</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Data de emissão da Nota Fiscal.">Emissão</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Nome da empresa que emitiu a Nota Fiscal.">Emitente</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="Valor total dos produtos/serviços na Nota Fiscal.">Valor Total</th>
@@ -65,7 +64,6 @@ const NotaFiscalTable: React.FC<NotaFiscalTableProps> = ({ notas, onSelectNota, 
             {paginatedNotas.map((nota) => (
               <tr key={nota.chave_acesso} className="hover:bg-gray-100 dark:hover:bg-gray-900/60">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{nota.numero}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 font-mono">{nota.chave_acesso}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{new Date(nota.data_emissao).toLocaleDateString()}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 truncate max-w-xs">{nota.nome_emitente}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">R$ {nota.valor_total.toFixed(2)}</td>

@@ -71,6 +71,7 @@ Este é um guia completo para configurar e rodar o projeto NCMIT em sua máquina
         nome_destinatario TEXT,
         doc_destinatario TEXT,
         uf_emitente CHAR(2) REFERENCES estado(uf),
+        uf_destinatario CHAR(2) REFERENCES estado(uf),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -166,4 +167,3 @@ Este é um guia completo para configurar e rodar o projeto NCMIT em sua máquina
     - `npm run dev`
 
 Agora você está pronto para usar o NCMIT! Crie uma conta e comece a fazer o upload de suas notas fiscais.
-```

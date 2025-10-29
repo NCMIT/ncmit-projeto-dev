@@ -44,6 +44,7 @@ export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fisc
 
   const dest = getElement(infNFe, 'dest');
   if (!dest) throw new Error("Estrutura de NFe inválida: Faltando tag obrigatória <dest>.");
+  const enderDest = getElement(dest, 'enderDest');
 
   const total = getElement(infNFe, 'total');
   if (!total) throw new Error("Estrutura de NFe inválida: Faltando tag obrigatória <total>.");
@@ -103,6 +104,7 @@ export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fisc
     nome_emitente: getTagValue(emit, 'xNome'),
     // FIX: Corrected typo from getTaggValue to getTagValue.
     uf_emitente: getTagValue(enderEmit, 'UF'),
+    uf_destinatario: enderDest ? getTagValue(enderDest, 'UF') : '',
     nome_destinatario: getTagValue(dest, 'xNome'),
     doc_destinatario: getTagValue(dest, 'CNPJ') || getTagValue(dest, 'CPF') || '',
     items: items,

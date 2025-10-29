@@ -62,12 +62,10 @@ const App: React.FC = () => {
   useEffect(() => {
     supabase?.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoading(false);
     });
 
     const { data: { subscription } } = supabase!.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      // Reset state on auth change
       if (_event === 'SIGNED_OUT') {
         setNotasFiscais([]);
         setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0 });
@@ -79,7 +77,10 @@ const App: React.FC = () => {
   }, [addToast]);
   
   const fetchNotasFiscais = useCallback(async () => {
-    if (!session) return;
+    if (!session) {
+        setLoading(false);
+        return;
+    };
     setLoading(true);
     const { data, error } = await supabase!
       .from('nota_fiscal')
@@ -88,6 +89,7 @@ const App: React.FC = () => {
     if (error) {
       addToast('Falha ao buscar notas fiscais: ' + error.message, 'error');
       console.error(error);
+      setNotasFiscais([]);
     } else {
       setNotasFiscais(data as NotaFiscal[] || []);
     }
@@ -97,6 +99,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (session) {
       fetchNotasFiscais();
+    } else {
+      setLoading(false); // Make sure loading stops if there's no session
     }
   }, [session, fetchNotasFiscais]);
 
@@ -107,7 +111,6 @@ const App: React.FC = () => {
   }, [notasFiscais]);
   
   useEffect(() => {
-    // Initialize the max value of the filter when the absolute max is calculated
     if (maxValorAbsoluto > 0 && filtros.valorMax === 0) {
       setFiltros(prev => ({ ...prev, valorMax: maxValorAbsoluto }));
     }
@@ -177,18 +180,7 @@ const App: React.FC = () => {
             throw itemsError;
           }
         }
-
-        const historicoData = {
-            fk_nota_fiscal_chave_acesso: chaveAcesso,
-            valor_original: notaFiscalCoreData.valor_total,
-            valor_tributado: notaFiscalCoreData.imposto_total,
-        };
-        const { error: historicoError } = await supabase!.from('historico_calculo').insert(historicoData);
-        if (historicoError) {
-            await supabase!.from('nota_fiscal').delete().eq('chave_acesso', chaveAcesso); // Rollback
-            throw historicoError;
-        }
-
+        
         return { status: 'success', file: file.name };
       } catch (err: any) {
         return { 
@@ -214,7 +206,6 @@ const App: React.FC = () => {
         console.error("Falhas no Upload:", status.failures);
     }
 
-
     if (status.successes > 0) {
         await fetchNotasFiscais();
     } else {
@@ -232,7 +223,6 @@ const App: React.FC = () => {
       if (dataFim && dataEmissao > dataFim) return false;
       if (filtros.emitente && !nota.nome_emitente.toLowerCase().includes(filtros.emitente.toLowerCase())) return false;
       if (filtros.valorMin > 0 && nota.valor_total < filtros.valorMin) return false;
-      // Note: valorMax can be 0, so we check if it is set and less than the max value
       if (filtros.valorMax > 0 && filtros.valorMax < maxValorAbsoluto && nota.valor_total > filtros.valorMax) return false;
 
       return true;
@@ -270,7 +260,6 @@ const App: React.FC = () => {
   if (loading && !session) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-brand-light dark:bg-brand-dark">
-              {/* Pode adicionar um spinner aqui se o carregamento inicial da sessão demorar */}
           </div>
       );
   }

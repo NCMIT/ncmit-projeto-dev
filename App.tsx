@@ -41,11 +41,10 @@ const App: React.FC = () => {
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedNota, setSelectedNota] = useState<NotaFiscal | null>(null);
-  const [filtros, setFiltros] = useState<Filtros>({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0 });
+  const [filtros, setFiltros] = useState<Filtros>({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0, ufDestino: '' });
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
   const [showAliquotaModal, setShowAliquotaModal] = useState<boolean>(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const sourcesChecked = useRef(false);
 
   const addToast = useCallback((message: string, type: Toast['type']) => {
     const newToast: Toast = {
@@ -60,41 +59,6 @@ const App: React.FC = () => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   };
 
-  // Efeito para checar a atualidade das fontes de dados de alíquotas
-  useEffect(() => {
-    if (sourcesChecked.current || !session) return;
-    sourcesChecked.current = true;
-
-    const OUTDATED_THRESHOLD_DAYS = 180;
-    let isAnySourceOutdated = false;
-
-    for (const source of ALIQUOTAS_DATA) {
-        try {
-            const [day, month, year] = source.lastUpdated.split('/').map(Number);
-            // Meses em JavaScript são 0-indexados (0 = Janeiro, 11 = Dezembro)
-            const lastUpdatedDate = new Date(year, month - 1, day);
-            const today = new Date();
-            const diffTime = today.getTime() - lastUpdatedDate.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays > OUTDATED_THRESHOLD_DAYS) {
-                isAnySourceOutdated = true;
-                break; // Para a verificação se encontrar qualquer fonte desatualizada
-            }
-        } catch (e) {
-            console.error("Erro ao parsear a data da fonte de dados:", source.lastUpdated, e);
-        }
-    }
-
-    if (isAnySourceOutdated) {
-        addToast(
-            'Atenção: Algumas fontes de dados de alíquotas podem estar desatualizadas. Recomenda-se cautela.',
-            'info'
-        );
-    }
-  }, [session, addToast]);
-
-
   useEffect(() => {
     supabase?.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -104,7 +68,7 @@ const App: React.FC = () => {
       setSession(session);
       if (_event === 'SIGNED_OUT') {
         setNotasFiscais([]);
-        setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0 });
+        setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0, ufDestino: '' });
         addToast('Você saiu com sucesso.', 'info');
       }
     });
@@ -204,10 +168,27 @@ const App: React.FC = () => {
           return { status: 'skipped', file: file.name };
         }
         
-        const analysisResult = await calculateTaxEstimate(notaFiscalCoreData, items);
+        const { analysis: analysisResult, itemTaxes } = await calculateTaxEstimate(notaFiscalCoreData, items);
+
+        const updatedItems = items.map((item, index) => {
+            const taxes = itemTaxes[index];
+            const valorBase = item.valor_total || 0; // No upload, valor_total é o vProd original
+            return {
+                ...item,
+                valor_total: valorBase + taxes.ipi + taxes.icms + taxes.pis + taxes.cofins,
+            };
+        });
+
+        const originalImpostoTotal = notaFiscalCoreData.imposto_total;
+        const originalValorTotal = notaFiscalCoreData.valor_total;
+        const impostoEstimadoTotal = analysisResult.imposto_estimado_total;
+        
+        const novoValorTotal = originalValorTotal - originalImpostoTotal + impostoEstimadoTotal;
 
         const notaFiscalData = {
             ...notaFiscalCoreData,
+            imposto_total: impostoEstimadoTotal,
+            valor_total: novoValorTotal,
             user_id: session.user.id,
             imposto_estimado_total: analysisResult.imposto_estimado_total,
             diferenca_imposto: analysisResult.diferenca_imposto,
@@ -225,7 +206,7 @@ const App: React.FC = () => {
         if (notaError) throw notaError;
         const chaveAcesso = insertedNota.chave_acesso;
 
-        const itemsData = items.map(item => ({ ...item, fk_nota_fiscal_chave_acesso: chaveAcesso }));
+        const itemsData = updatedItems.map(item => ({ ...item, fk_nota_fiscal_chave_acesso: chaveAcesso }));
         if (itemsData.length > 0) {
           const { error: itemsError } = await supabase!.from('item_nota_fiscal').insert(itemsData);
           if (itemsError) {
@@ -284,6 +265,7 @@ const App: React.FC = () => {
       if (dataInicio && dataEmissao < dataInicio) return false;
       if (dataFim && dataEmissao > dataFim) return false;
       if (filtros.emitente && !nota.nome_emitente.toLowerCase().includes(filtros.emitente.toLowerCase())) return false;
+      if (filtros.ufDestino && nota.uf_destinatario !== filtros.ufDestino) return false;
       if (filtros.valorMin > 0 && nota.valor_total < filtros.valorMin) return false;
       if (filtros.valorMax > 0 && filtros.valorMax < maxValorAbsoluto && nota.valor_total > filtros.valorMax) return false;
 
@@ -292,7 +274,7 @@ const App: React.FC = () => {
   }, [notasFiscais, filtros, maxValorAbsoluto]);
   
   const handleClearFilters = () => {
-    setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: maxValorAbsoluto });
+    setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: maxValorAbsoluto, ufDestino: '' });
   };
 
   const handleExportExcel = () => {
@@ -306,7 +288,6 @@ const App: React.FC = () => {
       { A: "Valor Total", B: n.valor_total },
       { A: "Imposto Total", B: n.imposto_total },
       { A: "Imposto Estimado", B: n.imposto_estimado_total },
-      { A: "Diferença Imposto", B: n.diferenca_imposto },
       {}, // Spacer row
       { A: "Cód. Item", B: "Descrição", C: "NCM", D: "Qtd", E: "Un.", F: "Vlr. Unit.", G: "Vlr. Total" },
       ...n.item_nota_fiscal.map(item => ({

@@ -26,12 +26,37 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
     setIsCalculating(true);
     setError(null);
     try {
-        const { items, ...notaCore } = nota;
-        const analysisResult = await calculateTaxEstimate(notaCore, nota.item_nota_fiscal);
+        const { item_nota_fiscal, ...notaCore } = nota;
+
+        const impostoDeclaradoOriginal = (nota.diferenca_imposto != null) 
+            ? (nota.imposto_total - nota.diferenca_imposto) 
+            : nota.imposto_total;
+            
+        const valorTotalOriginal = (nota.diferenca_imposto != null)
+            ? (nota.valor_total - (nota.imposto_estimado_total! - impostoDeclaradoOriginal))
+            : nota.valor_total;
+
+        const notaCoreParaCalculo = { ...notaCore, imposto_total: impostoDeclaradoOriginal, valor_total: valorTotalOriginal };
+
+        const { analysis: analysisResult, itemTaxes } = await calculateTaxEstimate(notaCoreParaCalculo, item_nota_fiscal);
+        
+        const updatedItems = nota.item_nota_fiscal.map((item, index) => {
+            const taxes = itemTaxes[index];
+            const valorBase = item.quantidade * item.valor_unitario;
+            return {
+                ...item,
+                valor_total: valorBase + taxes.ipi + taxes.icms + taxes.pis + taxes.cofins,
+            };
+        });
+
+        const novoImpostoEstimado = analysisResult.imposto_estimado_total;
+        const novoValorTotal = valorTotalOriginal - impostoDeclaradoOriginal + novoImpostoEstimado;
 
         const { error: updateError } = await supabase
             .from('nota_fiscal')
             .update({
+                imposto_total: novoImpostoEstimado,
+                valor_total: novoValorTotal,
                 imposto_estimado_total: analysisResult.imposto_estimado_total,
                 diferenca_imposto: analysisResult.diferenca_imposto,
                 calculo_premissas: analysisResult.calculo_premissas,
@@ -41,9 +66,18 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
             .eq('chave_acesso', nota.chave_acesso);
         
         if (updateError) throw updateError;
+        
+        const { error: itemsUpdateError } = await supabase
+            .from('item_nota_fiscal')
+            .upsert(updatedItems);
+        
+        if (itemsUpdateError) throw itemsUpdateError;
 
         const updatedNota: NotaFiscal = {
             ...nota,
+            imposto_total: novoImpostoEstimado,
+            valor_total: novoValorTotal,
+            item_nota_fiscal: updatedItems,
             ...analysisResult,
         };
         onUpdateNota(updatedNota);
@@ -83,7 +117,7 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
                  <DetailCard title="Valor Total">
                     <p className="text-lg font-semibold text-green-600 dark:text-green-400">R$ {nota.valor_total.toFixed(2)}</p>
                 </DetailCard>
-                <DetailCard title="Impostos">
+                <DetailCard title="Impostos (Estimado)">
                     <p className="text-lg font-semibold text-red-500 dark:text-red-400">R$ {nota.imposto_total.toFixed(2)}</p>
                 </DetailCard>
                 <DetailCard title="Itens">
@@ -116,49 +150,59 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">NCM</th>
                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Qtd.</th>
                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vlr. Unit.</th>
+                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Imposto Item</th>
                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vlr. Total</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-brand-surface-dark divide-y divide-gray-200 dark:divide-gray-600">
-                            {nota.item_nota_fiscal.map((p, index) => (
+                            {nota.item_nota_fiscal.map((p, index) => {
+                                const valorBase = p.quantidade * p.valor_unitario;
+                                const impostoItem = p.valor_total - valorBase;
+
+                                return (
                                 <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-900/40">
                                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-300">{p.codigo}</td>
                                     <td className="px-4 py-2 text-sm text-gray-800 dark:text-gray-300">{p.descricao}</td>
                                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-300">{p.codigo_ncm}</td>
                                     <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-800 dark:text-gray-300">{p.quantidade} {p.unidade}</td>
                                     <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-800 dark:text-gray-300">R$ {p.valor_unitario.toFixed(2)}</td>
-                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-800 dark:text-gray-300">R$ {p.valor_total.toFixed(2)}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-red-500 dark:text-red-400">R$ {Math.max(0, impostoItem).toFixed(2)}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-800 dark:text-gray-300 font-bold">R$ {p.valor_total.toFixed(2)}</td>
                                  </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
             </div>
 
             <div className="border-t dark:border-gray-700 pt-6">
-                 <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white flex items-center gap-2">
-                    Análise Fiscal
-                    {nota.possui_ncm_desconhecido && <WarningIcon className="w-5 h-5 text-yellow-500" title="O cálculo pode estar impreciso pois alguns NCMs não foram encontrados na base de referência." />}
-                 </h3>
+                <div className="flex justify-between items-center mb-4">
+                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        Análise Fiscal
+                        {nota.possui_ncm_desconhecido && <WarningIcon className="w-5 h-5 text-yellow-500" title="O cálculo pode estar impreciso pois alguns NCMs não foram encontrados na base de referência." />}
+                     </h3>
+                     <button 
+                        onClick={handleRecalculate}
+                        disabled={isCalculating}
+                        className="bg-brand-yellow hover:bg-brand-yellow-dark text-white font-bold py-2 px-4 rounded-lg inline-flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {isCalculating ? (
+                            <>
+                                <SpinnerIcon className="w-5 h-5 animate-spin" />
+                                Recalculando...
+                            </>
+                        ) : 'Recalcular Análise com IA'}
+                    </button>
+                </div>
                  
+                {error && <p className="text-red-500 text-sm mt-2 text-right">{error}</p>}
+
                  {nota.imposto_estimado_total != null && nota.diferenca_imposto != null ? (
-                     <div className="mt-4 p-4 rounded-lg bg-gray-100 dark:bg-gray-900/50 border dark:border-gray-700">
-                         <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Resultado da Estimativa</h4>
+                     <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-900/50 border dark:border-gray-700">
                          <div className="space-y-3 text-sm">
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                <span className="font-semibold text-gray-600 dark:text-gray-300">Imposto Declarado (Nota):</span>
-                                <span className="text-right font-bold text-red-600 dark:text-red-400">R$ {nota.imposto_total.toFixed(2)}</span>
-
-                                <span className="font-semibold text-gray-600 dark:text-gray-300">Imposto Estimado (Cálculo):</span>
-                                <span className="text-right font-bold text-blue-600 dark:text-blue-400">R$ {nota.imposto_estimado_total.toFixed(2)}</span>
-
-                                <span className="font-semibold text-gray-600 dark:text-gray-300">Diferença:</span>
-                                <span className={`text-right font-bold ${nota.diferenca_imposto > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
-                                    R$ {nota.diferenca_imposto.toFixed(2)}
-                                </span>
-                            </div>
                              {nota.calculo_premissas && (
-                                <div className="border-t dark:border-gray-600 pt-3 mt-3">
+                                <div>
                                     <h5 className="font-semibold mb-1 text-gray-700 dark:text-gray-200">Premissas do Cálculo:</h5>
                                     <ul className="list-disc list-inside text-xs text-gray-500 dark:text-gray-400 space-y-1">
                                         {nota.calculo_premissas.split('\n').map((premise, i) => <li key={i}>{premise}</li>)}
@@ -173,21 +217,8 @@ const NotaFiscalDetailModal: React.FC<NotaFiscalDetailModalProps> = ({ nota, onC
                          </div>
                      </div>
                  ) : (
-                    <div className="mt-4 p-4 rounded-lg bg-gray-100 dark:bg-gray-900/50 text-center text-gray-500 dark:text-gray-400">
-                        <p className="mb-4">Análise fiscal não disponível para esta nota (provavelmente foi importada antes do cálculo automático).</p>
-                        <button 
-                            onClick={handleRecalculate}
-                            disabled={isCalculating}
-                            className="bg-brand-yellow hover:bg-brand-yellow-dark text-white font-bold py-2 px-4 rounded-lg inline-flex items-center gap-2 disabled:opacity-50"
-                        >
-                            {isCalculating ? (
-                                <>
-                                    <SpinnerIcon className="w-5 h-5 animate-spin" />
-                                    Consultando IA...
-                                </>
-                            ) : 'Calcular Análise com IA'}
-                        </button>
-                        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                    <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-900/50 text-center text-gray-500 dark:text-gray-400">
+                        <p>Análise fiscal não disponível. Clique em "Recalcular" para gerar uma.</p>
                     </div>
                  )}
             </div>

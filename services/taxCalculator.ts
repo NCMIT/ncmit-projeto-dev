@@ -157,6 +157,37 @@ export const ALIQUOTAS_DATA = [
             text: 'Lei Complementar nº 123/06 (Simples Nacional)'
         },
         lastUpdated: '01/01/2024'
+    },
+    {
+        name: 'Siglas de Unidades Comerciais',
+        shortName: 'Unidades',
+        description: 'Abaixo estão algumas das siglas de unidades de medida mais comuns encontradas em notas fiscais e seus significados.',
+        sections: [
+            {
+                title: 'Unidades Comuns',
+                type: 'list-highlight',
+                content: [
+                    'UN | UNID: Unidade',
+                    'PC | PÇ: Peça',
+                    'CX: Caixa',
+                    'KG: Quilograma',
+                    'G: Grama',
+                    'L: Litro',
+                    'M: Metro',
+                    'M2: Metro Quadrado',
+                    'M3: Metro Cúbico',
+                    'PAR: Par',
+                    'KIT: Kit',
+                    'RL: Rolo',
+                    'JG: Jogo',
+                ],
+            }
+        ],
+        source: {
+            url: 'https://www.portaldaauditoria.com.br/tabela-unidade-de-medida-comercial-e-tributavel/',
+            text: 'Tabela de Unidades de Medida'
+        },
+        lastUpdated: '26/08/2024'
     }
 ];
 
@@ -170,14 +201,9 @@ interface NcmTaxRates {
 }
 
 const getTaxRatesFromAI = async (ncm: string, ufOrigem: string, ufDestino: string, isNaoContribuinte: boolean): Promise<NcmTaxRates | null> => {
-    // This check is a safeguard; process.env should be handled by the build tool.
-    if (!process.env.REACT_APP_SUPABASE_ANON_KEY) { // Using a known env var to check if env is loaded.
-        console.error("API Key for AI service not configured.");
-        return null;
-    }
-    
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        // A API Key (process.env.API_KEY) é injetada automaticamente pelo ambiente de execução.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         const tipoDestinatario = isNaoContribuinte ? "consumidor final não contribuinte de ICMS" : "contribuinte de ICMS (revenda)";
         const prompt = `Você é um especialista em tributação de autopeças no Brasil. Para o NCM '${ncm}', numa venda de '${ufOrigem}' para '${ufDestino}' destinada a um '${tipoDestinatario}', forneça a alíquota de IPI e a MVA-ST ajustada. Se for venda a não contribuinte (DIFAL), a MVA-ST é 0. Responda APENAS com o objeto JSON.`;
@@ -228,21 +254,34 @@ export interface TaxEstimateResult {
     data_calculo: string;
 }
 
+export interface ItemTaxValues {
+    ipi: number;
+    icms: number;
+    pis: number;
+    cofins: number;
+}
+
+export interface FullTaxEstimateResult {
+    analysis: TaxEstimateResult;
+    itemTaxes: ItemTaxValues[];
+}
+
 const IPI_RATES_FALLBACK: ReadonlyMap<string, number> = new Map([
     ['87082999', 4.88], ['87087090', 4.88], ['40169990', 4.23],
     ['84099112', 3.25], ['85111000', 3.25], ['84212300', 3.25],
     ['87083090', 3.25]
 ]);
 
-export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<ItemNotaFiscal, 'valor_total' | 'codigo_ncm' | 'codigo' | 'descricao' | 'cst_icms'>[]): Promise<TaxEstimateResult> => {
+export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<ItemNotaFiscal, 'valor_total' | 'codigo_ncm' | 'codigo' | 'descricao' | 'cst_icms' | 'quantidade' | 'valor_unitario'>[]): Promise<FullTaxEstimateResult> => {
     let totalIcms = 0;
     let totalIpi = 0;
-    const totalPisCofins = 0;
+    let totalPisCofins = 0;
     let possui_ncm_desconhecido = false;
     const details: string[] = [];
     const ncmRatesCache = new Map<string, NcmTaxRates | null>();
     const ncmWarningDetails: string[] = [];
     const isentosWarningAdded = new Set<string>();
+    const itemTaxes: ItemTaxValues[] = [];
 
     const cstsIsentosOuNaoTributados = new Set(['40', '41', '50', '51', '102', '103', '300', '400', '500']);
 
@@ -251,9 +290,12 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
     };
 
     const isSimplesNacional = notaCore.regime_tributario_emitente === '1';
+    const isRegimeNormal = notaCore.regime_tributario_emitente === '3';
 
     if (isSimplesNacional) {
         details.push('- Análise considera que o emitente é optante pelo Simples Nacional.');
+    } else if (isRegimeNormal) {
+        details.push('- Análise considera que o emitente está no Regime Normal (Lucro Presumido/Real).');
     }
 
     const estadoOrigem = getEstado(notaCore.uf_emitente);
@@ -262,9 +304,12 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
     const isDestinatarioNaoContribuinte = notaCore.indicador_ie_destinatario === '9';
 
     for (const item of items) {
-        const valorBase = item.valor_total || 0;
+        const valorBase = item.quantidade && item.valor_unitario ? item.quantidade * item.valor_unitario : item.valor_total || 0;
         const ncmLimpo = (item.codigo_ncm || '').replace(/\./g, '');
         let valorIpiItem = 0;
+        let icmsItem = 0;
+        let pisItem = 0;
+        let cofinsItem = 0;
         let mvaParaCalculo = MVA_AUTOPECAS_PADRAO_FALLBACK;
         
         if (ncmLimpo && !isSimplesNacional) { // IPI is not calculated for Simples Nacional
@@ -297,7 +342,17 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
             ncmWarningDetails.push(`- Item (Cód: ${item.codigo}): NCM não informado, IPI não calculado.`);
         }
 
+        // PIS/COFINS Calculation
+        if (isRegimeNormal) {
+            // Assuming Lucro Presumido (Cumulative) as a default for Regime Normal,
+            // unless it's a monofasic product, which is very common for auto parts.
+            // The safest general assumption for a revendedor is 0. But for a more complete analysis:
+            pisItem = valorBase * 0.0065; // 0.65%
+            cofinsItem = valorBase * 0.03;   // 3.00%
+        }
+
         totalIpi += valorIpiItem;
+        totalPisCofins += pisItem + cofinsItem;
         const baseCalculoIcms = valorBase + valorIpiItem;
         
         if (isSimplesNacional) {
@@ -311,7 +366,7 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
         } else {
             if (!isOperationInterestadual) {
                 const aliquotaEfetiva = estadoOrigem.aliquota + estadoOrigem.fcp;
-                totalIcms += baseCalculoIcms * (aliquotaEfetiva / 100);
+                icmsItem = baseCalculoIcms * (aliquotaEfetiva / 100);
             } else {
                 const aliquotaInterestadual = getAliquotaInterestadual(estadoOrigem.uf, estadoDestino.uf);
                 
@@ -322,7 +377,7 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
                     const icmsDestinoTotal = baseCalculoDifal * (aliquotaInternaDestinoEfetiva / 100);
                     const icmsInterestadual = baseCalculoIcms * (aliquotaInterestadual / 100);
                     const valorDifal = Math.max(0, icmsDestinoTotal - icmsInterestadual);
-                    totalIcms += icmsInterestadual + valorDifal;
+                    icmsItem = icmsInterestadual + valorDifal;
                 } else {
                     // Lógica de ICMS-ST para contribuinte
                     const icmsProprio = baseCalculoIcms * (aliquotaInterestadual / 100);
@@ -330,10 +385,12 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
                     const aliquotaInternaDestinoEfetiva = estadoDestino.aliquota + estadoDestino.fcp;
                     const icmsTotalST = baseCalculoST * (aliquotaInternaDestinoEfetiva / 100);
                     const icmsSTaRecolher = Math.max(0, icmsTotalST - icmsProprio);
-                    totalIcms += icmsProprio + icmsSTaRecolher;
+                    icmsItem = icmsProprio + icmsSTaRecolher;
                 }
             }
         }
+        totalIcms += icmsItem;
+        itemTaxes.push({ ipi: valorIpiItem, icms: icmsItem, pis: pisItem, cofins: cofinsItem });
     }
 
     if (ncmWarningDetails.length > 0) {
@@ -342,6 +399,15 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
 
     const totalEstimado = totalIcms + totalIpi + totalPisCofins;
     const diferenca = totalEstimado - notaCore.imposto_total;
+    
+    if (isRegimeNormal) {
+        details.unshift('- PIS/COFINS (0.65%/3.00%) calculado com base no Regime Normal (presumindo Lucro Presumido).');
+    } else if (isSimplesNacional) {
+        details.unshift('- PIS/COFINS estimado em 0% (Recolhimento unificado via DAS).');
+    } else {
+        // Fallback for other regimes like CRT 2
+        details.unshift('- PIS/COFINS estimado em 0%. Premissa: Regime Monofásico ou Simples Nacional (excesso de sublimite).');
+    }
     
     if (isSimplesNacional) {
         details.unshift('- IPI: Estimado em R$ 0,00 (Regra do Simples Nacional).');
@@ -356,13 +422,12 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
         }
     }
     
-    details.unshift('- PIS/COFINS estimado em 0% (Alíquota Zero). Premissa: O vendedor é um revendedor no Regime Monofásico.');
     if (!isSimplesNacional) {
        details.unshift(`- O valor do IPI foi somado à base de cálculo do ICMS.`);
     }
     details.push(`- Cálculo não considera regimes especiais ou benefícios fiscais.`);
 
-    return {
+    const analysis: TaxEstimateResult = {
         imposto_estimado_total: totalEstimado,
         imposto_estimado_icms: totalIcms,
         imposto_estimado_ipi: totalIpi,
@@ -371,5 +436,10 @@ export const calculateTaxEstimate = async (notaCore: NotaCoreData, items: Pick<I
         possui_ncm_desconhecido,
         calculo_premissas: details.join('\n'),
         data_calculo: new Date().toISOString()
+    };
+
+    return {
+        analysis,
+        itemTaxes,
     };
 };

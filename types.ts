@@ -43,6 +43,7 @@ export interface Filtros {
   emitente: string;
   valorMin: number;
   valorMax: number;
+  ufDestino: string;
 }
 
 export interface Toast {

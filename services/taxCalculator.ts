@@ -1,4 +1,3 @@
-import { GoogleGenAI, Type } from '@google/genai';
 import type { NotaFiscal, ItemNotaFiscal, EstadoICMS } from '../types';
 
 // ====================================================================
@@ -193,7 +192,7 @@ export const ALIQUOTAS_DATA = [
 
 
 // ====================================================================
-// GEMINI AI SERVICE FOR TAX RATES
+// GEMINI AI SERVICE FOR TAX RATES (MODIFICADO)
 // ====================================================================
 interface NcmTaxRates {
     ipi_aliquota: number;
@@ -202,43 +201,37 @@ interface NcmTaxRates {
 
 const getTaxRatesFromAI = async (ncm: string, ufOrigem: string, ufDestino: string, isNaoContribuinte: boolean): Promise<NcmTaxRates | null> => {
     try {
-        // A API Key (process.env.API_KEY) é injetada automaticamente pelo ambiente de execução.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        
-        const tipoDestinatario = isNaoContribuinte ? "consumidor final não contribuinte de ICMS" : "contribuinte de ICMS (revenda)";
-        const prompt = `Você é um especialista em tributação de autopeças no Brasil. Para o NCM '${ncm}', numa venda de '${ufOrigem}' para '${ufDestino}' destinada a um '${tipoDestinatario}', forneça a alíquota de IPI e a MVA-ST ajustada. Se for venda a não contribuinte (DIFAL), a MVA-ST é 0. Responda APENAS com o objeto JSON.`;
-
-        const responseSchema = {
-            type: Type.OBJECT,
-            properties: {
-                ipi_aliquota: { type: Type.NUMBER, description: "Alíquota de IPI em porcentagem. Ex: 4.88" },
-                mva_st_ajustada: { type: Type.NUMBER, description: "MVA-ST ajustada para a operação, em porcentagem. Ex: 71.78" },
+        // 1. Chame a nova função de API segura
+        const response = await fetch('/api/get-tax-rates', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
             },
-            required: ["ipi_aliquota", "mva_st_ajustada"],
-        };
-
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
-                temperature: 0.1
-            },
+            body: JSON.stringify({
+                ncm,
+                ufOrigem,
+                ufDestino,
+                isNaoContribuinte,
+            }),
         });
 
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText) as NcmTaxRates;
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Erro do servidor: ${response.status}`);
+        }
+
+        const rates: NcmTaxRates = await response.json();
+        return rates;
 
     } catch (error) {
-        console.error(`AI tax rate query failed for NCM ${ncm}:`, error);
-        return null;
+        console.error(`Chamada (client-side) para /api/get-tax-rates falhou para o NCM ${ncm}:`, error);
+        return null; // Retorna nulo para manter o fallback
     }
 };
 
 
 // ====================================================================
-// TAX CALCULATION LOGIC
+// TAX CALCULATION LOGIC (Sem alterações aqui)
 // ====================================================================
 
 type NotaCoreData = Omit<NotaFiscal, 'item_nota_fiscal' | 'user_id' >;

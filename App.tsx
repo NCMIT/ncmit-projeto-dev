@@ -156,10 +156,13 @@ const App: React.FC = () => {
         const parsedData = parseNFeXML(xmlText);
         const { items, ...notaFiscalCoreData } = parsedData;
 
+        // A RLS (Row Level Security) já garante que esta verificação
+        // só funcione para o usuário logado.
         const { data: existing, error: findError } = await supabase!
             .from('nota_fiscal')
             .select('chave_acesso')
             .eq('chave_acesso', notaFiscalCoreData.chave_acesso)
+            // .eq('user_id', session.user.id) // Esta linha é desnecessária por causa da RLS
             .single();
 
         if (findError && findError.code !== 'PGRST116') throw findError;
@@ -197,26 +200,43 @@ const App: React.FC = () => {
             possui_ncm_desconhecido: analysisResult.possui_ncm_desconhecido,
         };
 
+        // !! MUDANÇA AQUI !!
+        // Trocamos .select('chave_acesso') por .select('id')
         const { data: insertedNota, error: notaError } = await supabase!
           .from('nota_fiscal')
           .insert(notaFiscalData)
-          .select('chave_acesso')
+          .select('id') // Pedimos o novo 'id' de volta
           .single();
 
-        if (notaError) throw notaError;
-        const chaveAcesso = insertedNota.chave_acesso;
+        if (notaError) {
+            // Se o erro for de duplicidade (na nossa nova restrição unique)
+            if (notaError.code === '23505') {
+                 return { status: 'skipped', file: file.name };
+            }
+            throw notaError;
+        }
 
-        const itemsData = updatedItems.map(item => ({ ...item, fk_nota_fiscal_chave_acesso: chaveAcesso }));
+        // !! MUDANÇA AQUI !!
+        // Pegamos o 'id' retornado e o usamos como 'fk_nota_fiscal_id'
+        const notaId = insertedNota.id;
+        const itemsData = updatedItems.map(item => ({ 
+            ...item, 
+            fk_nota_fiscal_id: notaId // Usamos o novo ID
+        }));
+
         if (itemsData.length > 0) {
           const { error: itemsError } = await supabase!.from('item_nota_fiscal').insert(itemsData);
           if (itemsError) {
-            await supabase!.from('nota_fiscal').delete().eq('chave_acesso', chaveAcesso); // Rollback
+            // !! MUDANÇA AQUI !!
+            // Rollback usando o novo 'id'
+            await supabase!.from('nota_fiscal').delete().eq('id', notaId); // Rollback
             throw itemsError;
           }
         }
         
         const newNota: NotaFiscal = {
             ...notaFiscalData,
+            id: notaId, // Adiciona o ID ao objeto
             item_nota_fiscal: itemsData,
         };
 

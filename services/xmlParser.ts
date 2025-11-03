@@ -13,8 +13,8 @@ function getTagValue(element: Element | null, tagName: string): string {
     return tag?.textContent || '';
 }
 
-// FIX: Corrected typo in Omit type from 'fk_nota_fiscal_chave_a cesso' to 'fk_nota_fiscal_chave_acesso'.
-export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fiscal'> & { items: Omit<ItemNotaFiscal, 'id' | 'fk_nota_fiscal_chave_acesso'>[] } {
+// FIX: Updated Omit type to use 'fk_nota_fiscal_id'.
+export function parseNFeXML(xmlString: string): Omit<NotaFiscal, 'item_nota_fiscal'> & { items: Omit<ItemNotaFiscal, 'id' | 'fk_nota_fiscal_id'>[] } {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlString, "application/xml");
   

@@ -61,7 +61,6 @@ Este é um guia completo para configurar e rodar o projeto NCMIT em sua máquina
     -- Tabela principal da Nota Fiscal com referência ao usuário autenticado
     CREATE TABLE IF NOT EXISTS nota_fiscal (
         chave_acesso VARCHAR(44) PRIMARY KEY,
-        -- Coluna para associar a nota ao usuário que fez o upload
         user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
         numero VARCHAR(15) NOT NULL,
         data_emissao TIMESTAMPTZ NOT NULL,
@@ -72,6 +71,8 @@ Este é um guia completo para configurar e rodar o projeto NCMIT em sua máquina
         doc_destinatario TEXT,
         uf_emitente CHAR(2) REFERENCES estado(uf),
         uf_destinatario CHAR(2) REFERENCES estado(uf),
+        indicador_ie_destinatario TEXT,
+        regime_tributario_emitente TEXT,
         -- Colunas para análise fiscal automática
         imposto_estimado_total DECIMAL(15, 2),
         diferenca_imposto DECIMAL(15, 2),

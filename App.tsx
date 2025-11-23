@@ -503,7 +503,7 @@ const App: React.FC = () => {
       </main>
       {selectedNota && <NotaFiscalDetailModal nota={selectedNota} onClose={() => setSelectedNota(null)} onUpdateNota={handleUpdateNota} />}
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
-      {showAliquotaModal && <AliquotaModal onClose={() => setShowAliquotaModal(false)} />}
+      {showAliquotaModal && <AliquotaModal onClose={() => setShowAliquotaModal(false)} onAddToast={addToast} />}
       {/* Helper SVG for Chevron used in App.tsx directly if needed, but importing from Icon.tsx is cleaner */}
       <div style={{ display: 'none' }}>
         <svg id="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

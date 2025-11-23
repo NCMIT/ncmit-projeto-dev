@@ -61,7 +61,16 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
 
             <HelpSection title="4. Análise Tributária">
                 <p>Ao clicar em "Detalhes" de uma nota, o NCMIT utiliza Inteligência Artificial para estimar os impostos (ICMS, IPI, PIS/COFINS) baseados no NCM do produto e nos estados de origem/destino.</p>
-                <p className="mt-1">Você pode recalcular a análise a qualquer momento ou consultar a tabela de referência clicando no botão <strong>Alíquotas</strong>.</p>
+                <p className="mt-1">Você pode recalcular a análise a qualquer momento.</p>
+            </HelpSection>
+
+            <HelpSection title="5. Consulta e Atualização de Alíquotas">
+                <p>No botão <strong>Alíquotas</strong>, você acessa a tabela de referência usada pelo sistema.</p>
+                <ul className="list-disc list-inside ml-2 mt-2 text-gray-500 dark:text-gray-400">
+                    <li>O botão <strong>Verificar Atualizações</strong> consulta a base de conhecimento da Inteligência Artificial em tempo real.</li>
+                    <li>O sistema verifica se houve alterações na legislação (Federal ou Convênios ICMS) desde a data da última atualização mostrada.</li>
+                    <li>Se houver novidades, a tabela será atualizada automaticamente na sua tela. Caso contrário, um aviso informará que seus dados já estão atualizados.</li>
+                </ul>
             </HelpSection>
         </div>
       </div>

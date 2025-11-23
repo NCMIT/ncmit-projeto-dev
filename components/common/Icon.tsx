@@ -1,7 +1,9 @@
 
 import React from 'react';
 
-type IconProps = React.SVGProps<SVGSVGElement>;
+interface IconProps extends React.SVGProps<SVGSVGElement> {
+    title?: string;
+}
 
 export const SunIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
@@ -119,6 +121,13 @@ export const WarningIcon: React.FC<IconProps> = (props) => (
     </svg>
 );
 
+export const RefreshIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+
 export const FolderIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z" />
@@ -127,8 +136,8 @@ export const FolderIcon: React.FC<IconProps> = (props) => (
 
 export const FolderOpenIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path fillRule="evenodd" d="M19.5 21a3 3 0 003-3V9a3 3 0 00-3-3h-5.379a2.25 2.25 0 01-1.59-.659l-2.122-2.121c-.14-.141-.331-.22-.53-.22H4.5a3 3 0 00-3 3v12a3 3 0 003 3h15zm-9-13.5h9a1.5 1.5 0 011.5 1.5v3.619c0 .205-.121.391-.306.47l-3 1.286a.75.75 0 00-.339.955l1.215 2.836a.75.75 0 01-1.378.59l-1.214-2.835a2.25 2.25 0 00-1.018-1.135l-3-1.286a.75.75 0 01.29-1.405l3 1.286a.75.75 0 00.609.018l3-1.286A.75.75 0 0019.5 9h-9a.75.75 0 000 1.5h9A.75.75 0 0020.25 9H21a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5h-15a1.5 1.5 0 01-1.5-1.5v-9a1.5 1.5 0 011.5-1.5h.08a.75.75 0 000-1.5H4.5z" clipRule="evenodd" />
-    <path d="M1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z" />
+    <path d="M1.5 8.67v8.58a3 3 0 003 3h15a3 3 0 003-3V8.67l-8.928 5.493a3 3 0 01-3.144 0L1.5 8.67z" />
+    <path d="M22.5 6.908V6.75a3 3 0 00-3-3h-15a3 3 0 00-3 3v.158l9.714 5.978a1.5 1.5 0 001.572 0L22.5 6.908z" opacity="0.5" />
   </svg>
 );
 

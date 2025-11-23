@@ -1,3 +1,5 @@
+
+import { GoogleGenAI, Type } from '@google/genai';
 import type { NotaFiscal, ItemNotaFiscal, EstadoICMS } from '../types';
 
 // ====================================================================
@@ -192,7 +194,7 @@ export const ALIQUOTAS_DATA = [
 
 
 // ====================================================================
-// GEMINI AI SERVICE FOR TAX RATES (MODIFICADO)
+// GEMINI AI SERVICE FOR TAX RATES
 // ====================================================================
 interface NcmTaxRates {
     ipi_aliquota: number;
@@ -201,37 +203,97 @@ interface NcmTaxRates {
 
 const getTaxRatesFromAI = async (ncm: string, ufOrigem: string, ufDestino: string, isNaoContribuinte: boolean): Promise<NcmTaxRates | null> => {
     try {
-        // 1. Chame a nova função de API segura
-        const response = await fetch('/api/get-tax-rates', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+        // A API Key (process.env.API_KEY) é injetada automaticamente pelo ambiente de execução.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        const tipoDestinatario = isNaoContribuinte ? "consumidor final não contribuinte de ICMS" : "contribuinte de ICMS (revenda)";
+        const prompt = `Você é um especialista em tributação de autopeças no Brasil. Para o NCM '${ncm}', numa venda de '${ufOrigem}' para '${ufDestino}' destinada a um '${tipoDestinatario}', forneça a alíquota de IPI e a MVA-ST ajustada. Se for venda a não contribuinte (DIFAL), a MVA-ST é 0. Responda APENAS com o objeto JSON.`;
+
+        const responseSchema = {
+            type: Type.OBJECT,
+            properties: {
+                ipi_aliquota: { type: Type.NUMBER, description: "Alíquota de IPI em porcentagem. Ex: 4.88" },
+                mva_st_ajustada: { type: Type.NUMBER, description: "MVA-ST ajustada para a operação, em porcentagem. Ex: 71.78" },
             },
-            body: JSON.stringify({
-                ncm,
-                ufOrigem,
-                ufDestino,
-                isNaoContribuinte,
-            }),
+            required: ["ipi_aliquota", "mva_st_ajustada"],
+        };
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: responseSchema,
+                temperature: 0.1
+            },
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Erro do servidor: ${response.status}`);
-        }
-
-        const rates: NcmTaxRates = await response.json();
-        return rates;
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText) as NcmTaxRates;
 
     } catch (error) {
-        console.error(`Chamada (client-side) para /api/get-tax-rates falhou para o NCM ${ncm}:`, error);
-        return null; // Retorna nulo para manter o fallback
+        console.error(`AI tax rate query failed for NCM ${ncm}:`, error);
+        return null;
     }
 };
 
+export const checkTaxUpdatesWithAI = async (currentData: typeof ALIQUOTAS_DATA): Promise<{ hasUpdates: boolean, updatedData?: typeof ALIQUOTAS_DATA }> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const currentDate = new Date().toLocaleDateString('pt-BR');
+        
+        const prompt = `
+            Você é um assistente tributário especializado em legislação brasileira de autopeças.
+            Analise a data de hoje (${currentDate}) e verifique se houve alterações significativas nas alíquotas de ICMS (interestadual), IPI (TIPI) ou regras de PIS/COFINS para autopeças desde as datas de 'lastUpdated' informadas abaixo.
+            
+            Dados atuais: ${JSON.stringify(currentData.map(d => ({ name: d.name, lastUpdated: d.lastUpdated })))}
+
+            Se houver novas leis ou decretos federais importantes publicados após essas datas que alterem as alíquotas padrão mostradas, retorne 'hasUpdates': true e forneça o array de dados completo atualizado (mantendo a estrutura exata original) com a nova data em 'lastUpdated' e as descrições ajustadas.
+            Se não houver mudanças relevantes ou se as datas forem recentes, retorne 'hasUpdates': false.
+        `;
+
+        // Using a loose schema to allow flexible return of the complex object structure if needed, 
+        // but focusing on the boolean primarily.
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                // We define a simplified schema to ensure we get the boolean and potentially the data
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        hasUpdates: { type: Type.BOOLEAN },
+                        updatedData: { 
+                            type: Type.ARRAY, 
+                            items: { type: Type.OBJECT, properties: {}, nullable: true }, // Loose schema for the complex data
+                            description: "O array completo de ALIQUOTAS_DATA com as atualizações, se houver.",
+                            nullable: true
+                        }
+                    },
+                    required: ["hasUpdates"]
+                }
+            }
+        });
+        
+        const result = JSON.parse(response.text);
+        
+        // Validate if updatedData matches the structure roughly if returned
+        if (result.hasUpdates && result.updatedData && Array.isArray(result.updatedData)) {
+             return { hasUpdates: true, updatedData: result.updatedData as typeof ALIQUOTAS_DATA };
+        }
+
+        return { hasUpdates: false };
+
+    } catch (error) {
+        console.error("Failed to check tax updates:", error);
+        return { hasUpdates: false };
+    }
+}
+
 
 // ====================================================================
-// TAX CALCULATION LOGIC (Sem alterações aqui)
+// TAX CALCULATION LOGIC
 // ====================================================================
 
 type NotaCoreData = Omit<NotaFiscal, 'item_nota_fiscal' | 'user_id' >;

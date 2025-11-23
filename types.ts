@@ -1,8 +1,9 @@
+
 // types.ts
 
 export interface ItemNotaFiscal {
   id?: number;
-  fk_nota_fiscal_id: number; // MUDANÇA AQUI
+  fk_nota_fiscal_chave_acesso: string;
   codigo: string;
   codigo_ncm: string;
   descricao: string;
@@ -14,7 +15,6 @@ export interface ItemNotaFiscal {
 }
 
 export interface NotaFiscal {
-  id?: number; // MUDANÇA AQUI
   chave_acesso: string;
   numero: string;
   data_emissao: string;
@@ -44,7 +44,8 @@ export interface Filtros {
   emitente: string;
   valorMin: number;
   valorMax: number;
-  ufDestino: string;
+  ufEmitente: string;
+  limitRecent: number;
 }
 
 export interface Toast {

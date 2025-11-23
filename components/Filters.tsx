@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Filtros } from '../types';
 import { ExcelIcon, ClearIcon, FilterIcon, ChevronDownIcon, TaxIcon } from './common/Icon';
@@ -19,7 +20,7 @@ const Filters: React.FC<FiltersProps> = ({ filtros, setFiltros, onExportExcel, o
     const { name, value } = e.target;
     setFiltros(prev => ({
       ...prev,
-      [name]: value,
+      [name]: name === 'limitRecent' ? Number(value) : value,
     }));
   };
 
@@ -33,7 +34,7 @@ const Filters: React.FC<FiltersProps> = ({ filtros, setFiltros, onExportExcel, o
     setFiltros(prev => ({ ...prev, valorMax: newMax }));
   };
 
-  const areFiltersActive = filtros.emitente !== '' || filtros.dataInicio !== '' || filtros.dataFim !== '' || filtros.valorMin > 0 || filtros.valorMax < maxValorAbsoluto || filtros.ufDestino !== '';
+  const areFiltersActive = filtros.emitente !== '' || filtros.dataInicio !== '' || filtros.dataFim !== '' || filtros.valorMin > 0 || filtros.valorMax < maxValorAbsoluto || filtros.ufEmitente !== '';
 
   const minPosPercent = (filtros.valorMin / maxValorAbsoluto) * 100;
   const maxPosPercent = (filtros.valorMax / maxValorAbsoluto) * 100;
@@ -61,7 +62,7 @@ const Filters: React.FC<FiltersProps> = ({ filtros, setFiltros, onExportExcel, o
                 </button>
             </div>
         </div>
-        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isPanelOpen ? 'max-h-[500px] mt-4' : 'max-h-0'}`}>
+        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isPanelOpen ? 'max-h-[600px] mt-4' : 'max-h-0'}`}>
             <div className="border dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/30">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-6">
                     {/* Filtro Emitente */}
@@ -73,11 +74,11 @@ const Filters: React.FC<FiltersProps> = ({ filtros, setFiltros, onExportExcel, o
                         className="p-2 border rounded-md bg-white dark:bg-gray-800 dark:border-gray-700 focus:ring-brand-yellow focus:border-brand-yellow"
                         />
                     </div>
-                     {/* Filtro UF Destino */}
+                     {/* Filtro UF Emitente */}
                     <div className="flex flex-col">
-                        <label htmlFor="ufDestino" className="mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">UF Destino</label>
+                        <label htmlFor="ufEmitente" className="mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">UF Emitente</label>
                         <select
-                        name="ufDestino" id="ufDestino" value={filtros.ufDestino} onChange={handleInputChange}
+                        name="ufEmitente" id="ufEmitente" value={filtros.ufEmitente} onChange={handleInputChange}
                         className="p-2 border rounded-md bg-white dark:bg-gray-800 dark:border-gray-700 focus:ring-brand-yellow focus:border-brand-yellow"
                         >
                             <option value="">Todos</option>
@@ -86,7 +87,16 @@ const Filters: React.FC<FiltersProps> = ({ filtros, setFiltros, onExportExcel, o
                             ))}
                         </select>
                     </div>
-                    <div></div> {/* Spacer */}
+                    {/* Filtro Qtd Recentes */}
+                    <div className="flex flex-col">
+                        <label htmlFor="limitRecent" className="mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">Qtd. Recentes</label>
+                        <input
+                        type="number" name="limitRecent" id="limitRecent" value={filtros.limitRecent} onChange={handleInputChange}
+                        min="1" max="100"
+                        className="p-2 border rounded-md bg-white dark:bg-gray-800 dark:border-gray-700 focus:ring-brand-yellow focus:border-brand-yellow"
+                        title="Quantidade de notas a exibir na lista superior de lançamentos recentes."
+                        />
+                    </div>
                     {/* Filtro Data Início */}
                     <div className="flex flex-col">
                         <label htmlFor="dataInicio" className="mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">Data Início</label>

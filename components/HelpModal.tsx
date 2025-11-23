@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface HelpModalProps {
@@ -7,7 +8,7 @@ interface HelpModalProps {
 const HelpSection: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => (
     <div>
         <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2 border-b border-gray-300 dark:border-gray-600 pb-2">{title}</h3>
-        <div className="space-y-2 text-gray-600 dark:text-gray-300">
+        <div className="space-y-2 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
             {children}
         </div>
     </div>
@@ -33,10 +34,34 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
         </div>
 
         <div className="p-6 space-y-8">
-            <HelpSection title="Como Usar o NCMIT">
-                <p><strong>1. Upload de Arquivos XML:</strong> Arraste e solte ou selecione os arquivos <code>.xml</code> das suas notas fiscais na área de upload. O sistema processará e salvará os dados automaticamente, ignorando notas duplicadas.</p>
-                <p><strong>2. Filtragem e Busca:</strong> Use o painel de "Filtros" para encontrar notas por emitente, período ou faixa de valor. Os resultados na tabela são atualizados instantaneamente.</p>
-                <p><strong>3. Análise e Exportação:</strong> Clique em "Detalhes" para ver todas as informações de uma nota. Use os botões "Alíquotas" para consultar taxas de impostos e "Excel" para exportar um relatório completo dos dados filtrados.</p>
+            <HelpSection title="1. Upload de Notas Fiscais">
+                <p>Para adicionar notas ao sistema, arraste e solte arquivos <strong>.xml</strong> na área tracejada superior ou clique para selecionar do seu computador. O sistema irá processar o arquivo automaticamente.</p>
+                <ul className="list-disc list-inside ml-2 mt-2 text-gray-500 dark:text-gray-400">
+                    <li>O sistema identifica e ignora notas que já foram enviadas anteriormente.</li>
+                    <li>A data de organização das pastas será baseada na <strong>Data de Emissão</strong> contida no XML, e não na data do upload.</li>
+                </ul>
+            </HelpSection>
+
+            <HelpSection title="2. Organização e Visualização">
+                <p>O sistema organiza suas notas de duas formas simultâneas:</p>
+                <ul className="list-disc list-inside ml-2 mt-2 text-gray-500 dark:text-gray-400">
+                    <li><strong>Recentes:</strong> No topo, você vê as últimas notas lançadas no sistema (você pode configurar quantas quer ver no painel de Filtros).</li>
+                    <li><strong>Notas por Período:</strong> Logo abaixo, as notas são agrupadas automaticamente em pastas de <strong>Anos</strong> e <strong>Meses</strong> baseadas na emissão. Pastas vazias não são exibidas.</li>
+                </ul>
+            </HelpSection>
+
+            <HelpSection title="3. Filtros Inteligentes">
+                <p>Utilize o painel de "Filtros" para refinar sua busca. Ao aplicar um filtro (ex: nome do emitente ou faixa de valor):</p>
+                <ul className="list-disc list-inside ml-2 mt-2 text-gray-500 dark:text-gray-400">
+                    <li>A busca ocorre em <strong>todo o histórico</strong>.</li>
+                    <li>As pastas de Anos e Meses exibirão apenas as notas que correspondem aos filtros aplicados.</li>
+                    <li>Use o campo <strong>Qtd. Recentes</strong> para definir quantas notas devem aparecer na lista de acesso rápido.</li>
+                </ul>
+            </HelpSection>
+
+            <HelpSection title="4. Análise Tributária">
+                <p>Ao clicar em "Detalhes" de uma nota, o NCMIT utiliza Inteligência Artificial para estimar os impostos (ICMS, IPI, PIS/COFINS) baseados no NCM do produto e nos estados de origem/destino.</p>
+                <p className="mt-1">Você pode recalcular a análise a qualquer momento ou consultar a tabela de referência clicando no botão <strong>Alíquotas</strong>.</p>
             </HelpSection>
         </div>
       </div>

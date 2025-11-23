@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { SunIcon, MoonIcon, HelpIcon, LogoutIcon, LogoIcon } from './common/Icon';
@@ -17,15 +18,26 @@ const Header: React.FC<HeaderProps> = ({ onShowHelp, session }) => {
   };
 
   return (
-    <header className="bg-white dark:bg-brand-surface-dark shadow-md">
+    <header className="bg-white dark:bg-brand-surface-dark shadow-md transition-colors duration-300">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
-             <div className="text-gray-700 dark:text-gray-300">
-                <LogoIcon />
+        <div className="relative flex items-center justify-between h-16">
+          
+          {/* Left Side: Logo */}
+          <div className="flex items-center z-10">
+             <div className="flex items-center gap-1">
+                <div className="text-gray-800 dark:text-gray-200">
+                    <LogoIcon className="h-8 w-auto" />
+                </div>
               </div>
           </div>
-          <div className="flex items-center space-x-2 sm:space-x-4">
+
+          {/* Center: Dashboard Title */}
+          <div className="absolute left-1/2 transform -translate-x-1/2 top-1/2 -translate-y-1/2 pointer-events-none">
+            <span className="font-extrabold text-2xl tracking-widest text-gray-400 dark:text-white">DASHBOARD</span>
+          </div>
+
+          {/* Right Side: Actions */}
+          <div className="flex items-center space-x-2 sm:space-x-4 z-10">
             {session && (
               <div className="flex items-center space-x-2">
                 <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-300 truncate" title={session.user.email}>{session.user.email}</span>

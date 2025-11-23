@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, supabaseInitializationError } from './services/supabaseClient';
-import type { NotaFiscal, Filtros, Toast, ItemNotaFiscal } from './types';
+import type { NotaFiscal, Filtros, Toast } from './types';
 import { parseNFeXML } from './services/xmlParser';
-import { calculateTaxEstimate, ALIQUOTAS_DATA } from './services/taxCalculator';
+import { calculateTaxEstimate } from './services/taxCalculator';
 import Header from './components/Header';
 import FileUpload from './components/FileUpload';
 import Filters from './components/Filters';
@@ -14,6 +15,7 @@ import Auth from './components/Auth';
 import ToastContainer from './components/Toast';
 import { utils, writeFile } from 'xlsx';
 import type { Session } from '@supabase/supabase-js';
+import { FolderIcon, FolderOpenIcon, ChevronDownIcon } from './components/common/Icon';
 
 const getDetailedErrorMessage = (error: any): string => {
     if (error instanceof Error) return error.message;
@@ -41,10 +43,22 @@ const App: React.FC = () => {
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedNota, setSelectedNota] = useState<NotaFiscal | null>(null);
-  const [filtros, setFiltros] = useState<Filtros>({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0, ufDestino: '' });
+  const [filtros, setFiltros] = useState<Filtros>({ 
+      dataInicio: '', 
+      dataFim: '', 
+      emitente: '', 
+      valorMin: 0, 
+      valorMax: 0, 
+      ufEmitente: '',
+      limitRecent: 5 
+  });
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
   const [showAliquotaModal, setShowAliquotaModal] = useState<boolean>(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  
+  // State for Folder Navigation
+  const [expandedYears, setExpandedYears] = useState<Set<string>>(new Set());
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
   const addToast = useCallback((message: string, type: Toast['type']) => {
     const newToast: Toast = {
@@ -68,7 +82,7 @@ const App: React.FC = () => {
       setSession(session);
       if (_event === 'SIGNED_OUT') {
         setNotasFiscais([]);
-        setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0, ufDestino: '' });
+        setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: 0, ufEmitente: '', limitRecent: 5 });
         addToast('Você saiu com sucesso.', 'info');
       }
     });
@@ -84,7 +98,8 @@ const App: React.FC = () => {
     setLoading(true);
     const { data, error } = await supabase!
       .from('nota_fiscal')
-      .select('*, item_nota_fiscal(*)');
+      .select('*, item_nota_fiscal(*)')
+      .order('created_at', { ascending: false }); // Order by upload date descending
 
     if (error) {
       addToast('Falha ao buscar notas fiscais: ' + error.message, 'error');
@@ -100,12 +115,12 @@ const App: React.FC = () => {
     if (session) {
       fetchNotasFiscais();
     } else {
-      setLoading(false); // Make sure loading stops if there's no session
+      setLoading(false);
     }
   }, [session, fetchNotasFiscais]);
 
   const maxValorAbsoluto = useMemo(() => {
-    if (notasFiscais.length === 0) return 5000; // Default max
+    if (notasFiscais.length === 0) return 5000;
     const maxVal = Math.max(...notasFiscais.map(n => n.valor_total));
     return Math.ceil(maxVal > 0 ? maxVal : 5000);
   }, [notasFiscais]);
@@ -120,12 +135,10 @@ const App: React.FC = () => {
       setNotasFiscais(prevNotas => 
         prevNotas.map(n => n.chave_acesso === updatedNota.chave_acesso ? updatedNota : n)
       );
-      // Also update the selectedNota if it's the one being changed
       if (selectedNota?.chave_acesso === updatedNota.chave_acesso) {
           setSelectedNota(updatedNota);
       }
   };
-
 
   if (supabaseInitializationError || !supabase) {
     return (
@@ -156,13 +169,10 @@ const App: React.FC = () => {
         const parsedData = parseNFeXML(xmlText);
         const { items, ...notaFiscalCoreData } = parsedData;
 
-        // A RLS (Row Level Security) já garante que esta verificação
-        // só funcione para o usuário logado.
         const { data: existing, error: findError } = await supabase!
             .from('nota_fiscal')
             .select('chave_acesso')
             .eq('chave_acesso', notaFiscalCoreData.chave_acesso)
-            // .eq('user_id', session.user.id) // Esta linha é desnecessária por causa da RLS
             .single();
 
         if (findError && findError.code !== 'PGRST116') throw findError;
@@ -175,7 +185,7 @@ const App: React.FC = () => {
 
         const updatedItems = items.map((item, index) => {
             const taxes = itemTaxes[index];
-            const valorBase = item.valor_total || 0; // No upload, valor_total é o vProd original
+            const valorBase = item.valor_total || 0; 
             return {
                 ...item,
                 valor_total: valorBase + taxes.ipi + taxes.icms + taxes.pis + taxes.cofins,
@@ -200,43 +210,26 @@ const App: React.FC = () => {
             possui_ncm_desconhecido: analysisResult.possui_ncm_desconhecido,
         };
 
-        // !! MUDANÇA AQUI !!
-        // Trocamos .select('chave_acesso') por .select('id')
         const { data: insertedNota, error: notaError } = await supabase!
           .from('nota_fiscal')
           .insert(notaFiscalData)
-          .select('id') // Pedimos o novo 'id' de volta
+          .select('chave_acesso')
           .single();
 
-        if (notaError) {
-            // Se o erro for de duplicidade (na nossa nova restrição unique)
-            if (notaError.code === '23505') {
-                 return { status: 'skipped', file: file.name };
-            }
-            throw notaError;
-        }
+        if (notaError) throw notaError;
+        const chaveAcesso = insertedNota.chave_acesso;
 
-        // !! MUDANÇA AQUI !!
-        // Pegamos o 'id' retornado e o usamos como 'fk_nota_fiscal_id'
-        const notaId = insertedNota.id;
-        const itemsData = updatedItems.map(item => ({ 
-            ...item, 
-            fk_nota_fiscal_id: notaId // Usamos o novo ID
-        }));
-
+        const itemsData = updatedItems.map(item => ({ ...item, fk_nota_fiscal_chave_acesso: chaveAcesso }));
         if (itemsData.length > 0) {
           const { error: itemsError } = await supabase!.from('item_nota_fiscal').insert(itemsData);
           if (itemsError) {
-            // !! MUDANÇA AQUI !!
-            // Rollback usando o novo 'id'
-            await supabase!.from('nota_fiscal').delete().eq('id', notaId); // Rollback
+            await supabase!.from('nota_fiscal').delete().eq('chave_acesso', chaveAcesso); 
             throw itemsError;
           }
         }
         
         const newNota: NotaFiscal = {
             ...notaFiscalData,
-            id: notaId, // Adiciona o ID ao objeto
             item_nota_fiscal: itemsData,
         };
 
@@ -268,13 +261,15 @@ const App: React.FC = () => {
     }
 
     if (successfulUploads.length > 0) {
-        const newNotas = successfulUploads.map(s => s.nota);
-        setNotasFiscais(prev => [...prev, ...newNotas]);
-        setSelectedNota(newNotas[0]); // Abre o modal para a primeira nota nova
+        // Fetch again to ensure correct order and data integrity or prepend locally
+        // Simplest is to re-fetch to keep order logic consistent
+        fetchNotasFiscais();
+    } else {
+        setLoading(false);
     }
-    
-    setLoading(false);
   };
+
+  // --- Filtering Logic ---
 
   const filteredNotas = useMemo(() => {
     return notasFiscais.filter(nota => {
@@ -285,7 +280,7 @@ const App: React.FC = () => {
       if (dataInicio && dataEmissao < dataInicio) return false;
       if (dataFim && dataEmissao > dataFim) return false;
       if (filtros.emitente && !nota.nome_emitente.toLowerCase().includes(filtros.emitente.toLowerCase())) return false;
-      if (filtros.ufDestino && nota.uf_destinatario !== filtros.ufDestino) return false;
+      if (filtros.ufEmitente && nota.uf_emitente !== filtros.ufEmitente) return false;
       if (filtros.valorMin > 0 && nota.valor_total < filtros.valorMin) return false;
       if (filtros.valorMax > 0 && filtros.valorMax < maxValorAbsoluto && nota.valor_total > filtros.valorMax) return false;
 
@@ -293,8 +288,55 @@ const App: React.FC = () => {
     });
   }, [notasFiscais, filtros, maxValorAbsoluto]);
   
+  // --- Grouping Logic for Folders ---
+
+  const folderStructure = useMemo(() => {
+      const structure: Record<string, Record<string, NotaFiscal[]>> = {};
+
+      filteredNotas.forEach(nota => {
+          const date = new Date(nota.data_emissao);
+          const year = date.getFullYear().toString();
+          // Get Month Name (e.g., "Janeiro", "Fevereiro")
+          const month = date.toLocaleString('pt-BR', { month: 'long' });
+          // Capitalize
+          const monthCapitalized = month.charAt(0).toUpperCase() + month.slice(1);
+          // We need a key that sorts correctly, so maybe use number-name
+          const monthKey = `${String(date.getMonth() + 1).padStart(2, '0')} - ${monthCapitalized}`;
+
+          if (!structure[year]) {
+              structure[year] = {};
+          }
+          if (!structure[year][monthKey]) {
+              structure[year][monthKey] = [];
+          }
+          structure[year][monthKey].push(nota);
+      });
+      return structure;
+  }, [filteredNotas]);
+
+  const years = Object.keys(folderStructure).sort((a, b) => b.localeCompare(a)); // Sort years descending
+
+  const toggleYear = (year: string) => {
+      setExpandedYears(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(year)) newSet.delete(year);
+          else newSet.add(year);
+          return newSet;
+      });
+  };
+
+  const toggleMonth = (year: string, monthKey: string) => {
+      const uniqueKey = `${year}-${monthKey}`;
+      setExpandedMonths(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(uniqueKey)) newSet.delete(uniqueKey);
+          else newSet.add(uniqueKey);
+          return newSet;
+      });
+  };
+
   const handleClearFilters = () => {
-    setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: maxValorAbsoluto, ufDestino: '' });
+    setFiltros({ dataInicio: '', dataFim: '', emitente: '', valorMin: 0, valorMax: maxValorAbsoluto, ufEmitente: '', limitRecent: 5 });
   };
 
   const handleExportExcel = () => {
@@ -303,17 +345,18 @@ const App: React.FC = () => {
       { A: "Número", B: n.numero },
       { A: "Emissão", B: new Date(n.data_emissao).toLocaleString() },
       { A: "Emitente", B: n.nome_emitente },
+      { A: "UF Emitente", B: n.uf_emitente },
       { A: "Destinatário", B: n.nome_destinatario },
       { A: "Doc. Destinatário", B: n.doc_destinatario },
       { A: "Valor Total", B: n.valor_total },
       { A: "Imposto Total", B: n.imposto_total },
       { A: "Imposto Estimado", B: n.imposto_estimado_total },
-      {}, // Spacer row
+      {}, 
       { A: "Cód. Item", B: "Descrição", C: "NCM", D: "Qtd", E: "Un.", F: "Vlr. Unit.", G: "Vlr. Total" },
       ...n.item_nota_fiscal.map(item => ({
         A: item.codigo, B: item.descricao, C: item.codigo_ncm, D: item.quantidade, E: item.unidade, F: item.valor_unitario, G: item.valor_total
       })),
-      {}, // Spacer row
+      {}, 
     ]));
 
     const worksheet = utils.json_to_sheet(worksheetData, { skipHeader: true });
@@ -333,6 +376,16 @@ const App: React.FC = () => {
     return <Auth />;
   }
 
+  // Recent notes are simply the first X of the current filtered view (or all notes if we want raw history, 
+  // but filtering usually implies we want to see recent matches).
+  // The prompt says "X primeiras notas do sistema (em ordem que foram lançadas no sistema)".
+  // `notasFiscais` is already sorted by creation date desc from fetch.
+  // We should probably use the unfiltered `notasFiscais` for the "Recent Uploads" section to strictly follow "do sistema",
+  // OR use `filteredNotas` to respect filters. Given the UX, "do sistema" usually implies Global history.
+  // However, if I filter by "2020", showing 2024 notes in "Recent" might be confusing if the user thinks "Recent" respects filters.
+  // I will use `filteredNotas` to make it cohesive, but label it clearly.
+  const recentNotes = filteredNotas.slice(0, filtros.limitRecent);
+
   return (
     <div className="min-h-screen text-gray-800 dark:text-gray-200 transition-colors duration-300">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -351,17 +404,112 @@ const App: React.FC = () => {
               onShowAliquotas={() => setShowAliquotaModal(true)}
               maxValorAbsoluto={maxValorAbsoluto}
             />
-            <NotaFiscalTable
-              notas={filteredNotas}
-              onSelectNota={setSelectedNota}
-              isLoading={loading}
-            />
+
+            {/* Recent Invoices Section */}
+            <div className="mb-8">
+                <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300 border-b dark:border-gray-700 pb-2">
+                    Últimas {Math.min(filtros.limitRecent, filteredNotas.length)} notas (de {filteredNotas.length})
+                </h3>
+                <NotaFiscalTable
+                    notas={recentNotes}
+                    onSelectNota={setSelectedNota}
+                    isLoading={loading}
+                />
+            </div>
+            
+            {/* Folders Section */}
+            <div className="mt-8 space-y-2">
+                 <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300 border-b dark:border-gray-700 pb-2">
+                    Notas por Período
+                </h3>
+                {years.length === 0 && !loading && (
+                    <p className="text-gray-500 dark:text-gray-400 italic">Nenhuma pasta encontrada para os filtros aplicados.</p>
+                )}
+                {years.map(year => {
+                    const isYearExpanded = expandedYears.has(year);
+                    const months = Object.keys(folderStructure[year]).sort((a, b) => b.localeCompare(a)); // Sort months desc (Dec first)
+                    const totalNotesInYear = months.reduce((acc, m) => acc + folderStructure[year][m].length, 0);
+
+                    return (
+                        <div key={year} className="border dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900/30">
+                            {/* Year Header */}
+                            <div 
+                                onClick={() => toggleYear(year)}
+                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    {isYearExpanded ? 
+                                        <FolderOpenIcon className="w-6 h-6 text-brand-yellow-dark" /> : 
+                                        <FolderIcon className="w-6 h-6 text-brand-yellow" />
+                                    }
+                                    <span className="font-bold text-lg">{year}</span>
+                                    <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                                        {totalNotesInYear} notas
+                                    </span>
+                                </div>
+                                <ChevronDownIcon className={`w-5 h-5 transition-transform text-gray-500 ${isYearExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+
+                            {/* Months List */}
+                            {isYearExpanded && (
+                                <div className="border-t dark:border-gray-700">
+                                    {months.map(monthKey => {
+                                        const uniqueMonthKey = `${year}-${monthKey}`;
+                                        const isMonthExpanded = expandedMonths.has(uniqueMonthKey);
+                                        const notesInMonth = folderStructure[year][monthKey];
+
+                                        return (
+                                            <div key={monthKey} className="ml-4 border-l-2 border-gray-200 dark:border-gray-700">
+                                                {/* Month Header */}
+                                                <div 
+                                                    onClick={() => toggleMonth(year, monthKey)}
+                                                    className="flex items-center justify-between p-3 pl-4 cursor-pointer hover:bg-white dark:hover:bg-gray-800/50 transition-colors"
+                                                >
+                                                     <div className="flex items-center gap-3">
+                                                        {isMonthExpanded ? 
+                                                            <FolderOpenIcon className="w-5 h-5 text-brand-yellow-dark" /> : 
+                                                            <FolderIcon className="w-5 h-5 text-brand-yellow" />
+                                                        }
+                                                        <span className="font-medium">{monthKey.split(' - ')[1]}</span>
+                                                        <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                                                            {notesInMonth.length}
+                                                        </span>
+                                                    </div>
+                                                    <ChevronDownIcon className={`w-4 h-4 transition-transform text-gray-400 ${isMonthExpanded ? 'rotate-180' : ''}`} />
+                                                </div>
+
+                                                {/* Month Content (Table) */}
+                                                {isMonthExpanded && (
+                                                    <div className="p-2 bg-white dark:bg-brand-surface-dark border-t border-b dark:border-gray-700 ml-4 rounded-bl-lg">
+                                                        <NotaFiscalTable 
+                                                            notas={notesInMonth}
+                                                            onSelectNota={setSelectedNota}
+                                                            isLoading={false}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
           </div>
         </div>
       </main>
       {selectedNota && <NotaFiscalDetailModal nota={selectedNota} onClose={() => setSelectedNota(null)} onUpdateNota={handleUpdateNota} />}
       {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
       {showAliquotaModal && <AliquotaModal onClose={() => setShowAliquotaModal(false)} />}
+      {/* Helper SVG for Chevron used in App.tsx directly if needed, but importing from Icon.tsx is cleaner */}
+      <div style={{ display: 'none' }}>
+        <svg id="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
     </div>
   );
 };

@@ -4,8 +4,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
 
 export default async function handler(
-  req: VercelRequest, 
-  res: VercelResponse
+  req: any, 
+  res: any
 ) {
     // 1. Apenas aceite requisições POST
     if (req.method !== 'POST') {
